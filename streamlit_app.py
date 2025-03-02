@@ -1,6 +1,6 @@
 import pandas as pd
 import streamlit as st
-from io import StringIO
+from io import BytesIO
 import requests
 
 # Judul aplikasi
@@ -17,16 +17,11 @@ def load_data():
         # Unduh file dari Google Drive
         response = requests.get(url)
         if response.status_code == 200:
-            data = StringIO(response.text)
-            
-            # Debugging: Tampilkan 5 baris pertama
-            lines = response.text.splitlines()[:5]
-            st.write("Isi 5 baris pertama file CSV:")
-            for line in lines:
-                st.write(line)
-            
-            # Baca file CSV
+            data = BytesIO(response.content)
             df = pd.read_csv(data, sep=',', encoding='utf-8', on_bad_lines='skip')
+            
+            # Pastikan kolom tgl_transaksi dalam format datetime
+            df['tgl_transaksi'] = pd.to_datetime(df['tgl_transaksi'], errors='coerce')
             return df
         else:
             st.error(f"Gagal memuat data. Status code: {response.status_code}")
@@ -40,7 +35,7 @@ df = load_data()
 
 if df is not None:
     # Sidebar untuk navigasi
-    menu = st.sidebar.selectbox("Menu", ["Data Lengkap", "Filter Data", "Visualisasi"])
+    menu = st.sidebar.selectbox("Menu", ["Data Lengkap", "Filter Data"])
 
     # Menu 1: Data Lengkap
     if menu == "Data Lengkap":
@@ -51,52 +46,53 @@ if df is not None:
     elif menu == "Filter Data":
         st.header("Filter Data")
 
-        # Filter berdasarkan kolom tertentu
-        filter_columns = [
-            "jns_transaksi", "kd_unit", "nm_unit", "kd_sub_unit", "nm_sub_unit",
-            "kd_lv_1", "nm_lv_1", "kd_lv_2", "nm_lv_2", "kd_lv_3", "nm_lv_3",
-            "kd_lv_4", "nm_lv_4", "kd_lv_5", "nm_lv_5", "kd_lv_6", "nm_lv_6"
+        # Radio button untuk memilih kode level
+        level_options = ["kd_lv_1", "kd_lv_2", "kd_lv_3", "kd_lv_4", "kd_lv_5", "kd_lv_6"]
+        selected_level = st.radio("Pilih Kode Level", level_options)
+
+        # Radio button untuk memilih nama unit atau sub unit
+        unit_options = ["nm_unit", "nm_sub_unit"]
+        selected_unit = st.radio("Pilih Nama Unit atau Sub Unit", unit_options)
+
+        # Multiselect widget untuk filter nama akun sesuai level
+        unique_accounts = list(df[selected_level].dropna().unique())
+        selected_accounts = st.multiselect(f"Pilih Nama Akun ({selected_level})", unique_accounts)
+
+        # Slider untuk memilih bulan
+        months = [
+            "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+            "Juli", "Agustus", "September", "Oktober", "November", "Desember"
         ]
-
-        filters = {}
-        for col in filter_columns:
-            unique_values = list(df[col].dropna().unique())
-            selected_values = st.multiselect(f"Pilih {col}", ["Semua"] + unique_values)
-            if "Semua" not in selected_values and selected_values:
-                filters[col] = selected_values
-
-        # Filter berdasarkan rentang debet dan kredit
-        st.subheader("Filter Berdasarkan Nilai Debet dan Kredit")
-        min_debet, max_debet = st.slider(
-            "Rentang Debet",
-            float(df["debet"].min()), float(df["debet"].max()),
-            (float(df["debet"].min()), float(df["debet"].max()))
-        )
-        min_kredit, max_kredit = st.slider(
-            "Rentang Kredit",
-            float(df["kredit"].min()), float(df["kredit"].max()),
-            (float(df["kredit"].min()), float(df["kredit"].max()))
-        )
+        month_map = {
+            "Januari": 1, "Februari": 2, "Maret": 3, "April": 4,
+            "Mei": 5, "Juni": 6, "Juli": 7, "Agustus": 8,
+            "September": 9, "Oktober": 10, "November": 11, "Desember": 12
+        }
+        selected_month = st.select_slider("Pilih Bulan", options=months)
 
         # Terapkan filter
         filtered_df = df.copy()
-        for col, values in filters.items():
-            filtered_df = filtered_df[filtered_df[col].isin(values)]
 
-        # Terapkan filter untuk debet dan kredit
-        filtered_df = filtered_df[
-            (filtered_df["debet"] >= min_debet) & (filtered_df["debet"] <= max_debet) &
-            (filtered_df["kredit"] >= min_kredit) & (filtered_df["kredit"] <= max_kredit)
-        ]
+        # Filter berdasarkan nama akun
+        if selected_accounts:
+            filtered_df = filtered_df[filtered_df[selected_level].isin(selected_accounts)]
 
-        # Tombol reset filter
-        if st.button("Reset Filter"):
-            filtered_df = df.copy()
+        # Filter berdasarkan nama unit atau sub unit
+        unique_units = list(filtered_df[selected_unit].dropna().unique())
+        selected_unit_value = st.selectbox(f"Pilih {selected_unit}", ["Semua"] + unique_units)
+        if selected_unit_value != "Semua":
+            filtered_df = filtered_df[filtered_df[selected_unit] == selected_unit_value]
+
+        # Filter berdasarkan bulan
+        selected_month_number = month_map[selected_month]
+        filtered_df = filtered_df[filtered_df['tgl_transaksi'].dt.month == selected_month_number]
 
         # Tampilkan hasil filter
         if not filtered_df.empty:
             st.subheader("Data yang Difilter")
-            filtered_df = filtered_df[["debet", "kredit", "uraian"]]
+            filtered_df = filtered_df[
+                ["nomor", "no_bukti", "tgl_transaksi", selected_unit, "nm_lv_1", "debet", "kredit", "uraian"]
+            ]
 
             # Hitung total debet dan kredit
             total_debet = filtered_df["debet"].sum()
@@ -116,44 +112,24 @@ if df is not None:
             # Tampilkan tabel
             st.dataframe(final_df)
 
-            # Download hasil filter sebagai CSV
+            # Download hasil filter sebagai Excel
             @st.cache_data
-            def convert_df_to_csv(df):
-                return df.to_csv(index=False).encode('utf-8')
+            def convert_df_to_excel(df):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine="openpyxl") as writer:
+                    df.to_excel(writer, index=False, sheet_name="Filtered_Data")
+                output.seek(0)
+                return output.getvalue()
 
-            csv = convert_df_to_csv(final_df)
+            excel_file = convert_df_to_excel(final_df)
             st.download_button(
-                label="Download Data yang Difilter",
-                data=csv,
-                file_name="filtered_data.csv",
-                mime="text/csv"
+                label="Download Data yang Difilter (Excel)",
+                data=excel_file,
+                file_name="filtered_data.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
         else:
             st.warning("Tidak ada data yang sesuai dengan filter.")
-
-    # Menu 3: Visualisasi
-    elif menu == "Visualisasi":
-        st.header("Visualisasi Data")
-
-        # Pie chart untuk distribusi debet dan kredit
-        total_debet = df["debet"].sum()
-        total_kredit = df["kredit"].sum()
-
-        st.subheader("Distribusi Debet dan Kredit")
-        fig, ax = plt.subplots()
-        ax.pie([total_debet, total_kredit], labels=["Debet", "Kredit"], autopct="%1.1f%%", startangle=90)
-        ax.axis('equal')  # Equal aspect ratio ensures that pie is drawn as a circle.
-        st.pyplot(fig)
-
-        # Bar chart untuk total transaksi per unit
-        st.subheader("Total Transaksi per Unit")
-        total_per_unit = df.groupby("kd_unit")[["debet", "kredit"]].sum().reset_index()
-        fig, ax = plt.subplots()
-        total_per_unit.plot(kind="bar", x="kd_unit", ax=ax)
-        ax.set_title("Total Debet dan Kredit per Unit")
-        ax.set_xlabel("Kode Unit")
-        ax.set_ylabel("Jumlah")
-        st.pyplot(fig)
 
 else:
     st.warning("Data tidak dapat dimuat. Pastikan file di Google Drive tersedia dan dapat diakses.")
