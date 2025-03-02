@@ -6,8 +6,8 @@ import requests
 # Judul aplikasi
 st.title("Aplikasi Visualisasi Data Transaksi")
 
-# ID file Google Drive (diambil dari URL yang Anda berikan)
-file_id = "1p2PYISBdkAdFIFf41chb5ltw39L35ztP"  # ID file Anda
+# ID file Google Drive
+file_id = "1p2PYISBdkAdFIFf41chb5ltw39L35ztP"
 url = f"https://drive.google.com/uc?export=download&id={file_id}"
 
 # Fungsi untuk membaca data dari Google Drive
@@ -18,7 +18,15 @@ def load_data():
         response = requests.get(url)
         if response.status_code == 200:
             data = StringIO(response.text)
-            df = pd.read_csv(data)
+            
+            # Debugging: Tampilkan 5 baris pertama
+            lines = response.text.splitlines()[:5]
+            st.write("Isi 5 baris pertama file CSV:")
+            for line in lines:
+                st.write(line)
+            
+            # Baca file CSV
+            df = pd.read_csv(data, sep=',', encoding='utf-8', on_bad_lines='skip')
             return df
         else:
             st.error(f"Gagal memuat data. Status code: {response.status_code}")
