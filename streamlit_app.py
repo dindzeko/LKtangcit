@@ -6,9 +6,9 @@ import requests
 # Judul aplikasi
 st.title("Aplikasi Visualisasi Data Transaksi")
 
-# ID file Google Drive (Anda perlu mengganti ini dengan ID file Anda)
-file_id = "your-file-id"  # Ganti dengan ID file Google Drive Anda
-url = f"https://drive.google.com/file/d/1p2PYISBdkAdFIFf41chb5ltw39L35ztP/view?usp=drive_link"
+# ID file Google Drive (diambil dari URL yang Anda berikan)
+file_id = "1p2PYISBdkAdFIFf41chb5ltw39L35ztP"  # ID file Anda
+url = f"https://drive.google.com/uc?export=download&id={file_id}"
 
 # Fungsi untuk membaca data dari Google Drive
 @st.cache_data
@@ -125,4 +125,4 @@ if df is not None:
         st.pyplot(fig)
 
 else:
-    st.warning("Data tidak dapat dimuat. Pastikan URL Google Drive valid.")
+    st.warning("Data tidak dapat dimuat. Pastikan file di Google Drive tersedia dan dapat diakses.")
