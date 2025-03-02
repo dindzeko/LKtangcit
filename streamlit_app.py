@@ -50,13 +50,24 @@ if df is not None:
         level_options = ["kd_lv_1", "kd_lv_2", "kd_lv_3", "kd_lv_4", "kd_lv_5", "kd_lv_6"]
         selected_level = st.radio("Pilih Kode Level", level_options)
 
-        # Radio button untuk memilih nama unit atau sub unit
+        # Tentukan nama akun berdasarkan level yang dipilih
+        account_column = selected_level.replace("kd_", "nm_")  # Ubah kd_lv_X menjadi nm_lv_X
+
+        # Multiselect widget untuk memilih Nama Unit atau Sub Unit
         unit_options = ["nm_unit", "nm_sub_unit"]
-        selected_unit = st.radio("Pilih Nama Unit atau Sub Unit", unit_options)
+        selected_unit_type = st.radio("Pilih Tipe Unit", unit_options)
+        unique_units = list(df[selected_unit_type].dropna().unique())
+        selected_units = st.multiselect(
+            f"Pilih {selected_unit_type}", 
+            unique_units
+        )
 
         # Multiselect widget untuk filter nama akun sesuai level
-        unique_accounts = list(df[selected_level].dropna().unique())
-        selected_accounts = st.multiselect(f"Pilih Nama Akun ({selected_level})", unique_accounts)
+        unique_accounts = list(df[account_column].dropna().unique())
+        selected_accounts = st.multiselect(
+            f"Pilih Nama Akun ({account_column})", 
+            unique_accounts
+        )
 
         # Slider untuk memilih bulan
         months = [
@@ -75,13 +86,11 @@ if df is not None:
 
         # Filter berdasarkan nama akun
         if selected_accounts:
-            filtered_df = filtered_df[filtered_df[selected_level].isin(selected_accounts)]
+            filtered_df = filtered_df[filtered_df[account_column].isin(selected_accounts)]
 
         # Filter berdasarkan nama unit atau sub unit
-        unique_units = list(filtered_df[selected_unit].dropna().unique())
-        selected_unit_value = st.selectbox(f"Pilih {selected_unit}", ["Semua"] + unique_units)
-        if selected_unit_value != "Semua":
-            filtered_df = filtered_df[filtered_df[selected_unit] == selected_unit_value]
+        if selected_units:
+            filtered_df = filtered_df[filtered_df[selected_unit_type].isin(selected_units)]
 
         # Filter berdasarkan bulan
         selected_month_number = month_map[selected_month]
@@ -91,7 +100,7 @@ if df is not None:
         if not filtered_df.empty:
             st.subheader("Data yang Difilter")
             filtered_df = filtered_df[
-                ["nomor", "no_bukti", "tgl_transaksi", selected_unit, "nm_lv_1", "debet", "kredit", "uraian"]
+                ["nomor", "no_bukti", "tgl_transaksi", selected_unit_type, account_column, "debet", "kredit", "uraian"]
             ]
 
             # Hitung total debet dan kredit
@@ -116,9 +125,8 @@ if df is not None:
             @st.cache_data
             def convert_df_to_excel(df):
                 output = BytesIO()
-                with pd.ExcelWriter(output, engine="openpyxl") as writer:
-                    df.to_excel(writer, index=False, sheet_name="Filtered_Data")
-                output.seek(0)
+                df.to_excel(output, index=False, sheet_name="Filtered_Data", engine="openpyxl")
+                output.seek(0)  # Kembalikan pointer ke awal file
                 return output.getvalue()
 
             excel_file = convert_df_to_excel(final_df)
