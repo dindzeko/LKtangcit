@@ -8,7 +8,7 @@ st.title("Aplikasi Visualisasi Data Transaksi")
 
 # ID file Google Drive (Anda perlu mengganti ini dengan ID file Anda)
 file_id = "your-file-id"  # Ganti dengan ID file Google Drive Anda
-url = f"https://drive.google.com/uc?export=download&id={file_id}"
+url = f"https://drive.google.com/file/d/1p2PYISBdkAdFIFf41chb5ltw39L35ztP/view?usp=drive_link"
 
 # Fungsi untuk membaca data dari Google Drive
 @st.cache_data
