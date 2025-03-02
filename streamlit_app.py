@@ -117,16 +117,26 @@ if df is not None:
             total_debet = filtered_df["debet"].sum()
             total_kredit = filtered_df["kredit"].sum()
 
+            # Tambahkan baris "Jumlah"
+            jumlah_row = {"nomor": "", "no_bukti": "", "tgl_transaksi": "", 
+                          selected_unit_type: "", account_column: "Jumlah", 
+                          "debet": total_debet, "kredit": total_kredit, "uraian": ""}
+
             # Hitung saldo
             saldo = total_debet - total_kredit
             if saldo > 0:
-                saldo_row = {"debet": saldo, "kredit": 0, "uraian": "Saldo"}
+                saldo_row = {"nomor": "", "no_bukti": "", "tgl_transaksi": "", 
+                             selected_unit_type: "", account_column: "Saldo", 
+                             "debet": saldo, "kredit": 0, "uraian": ""}
             else:
-                saldo_row = {"debet": 0, "kredit": abs(saldo), "uraian": "Saldo"}
+                saldo_row = {"nomor": "", "no_bukti": "", "tgl_transaksi": "", 
+                             selected_unit_type: "", account_column: "Saldo", 
+                             "debet": 0, "kredit": abs(saldo), "uraian": ""}
 
-            # Tambahkan baris saldo ke dataframe
+            # Tambahkan baris "Jumlah" dan "Saldo" ke dataframe
+            jumlah_df = pd.DataFrame([jumlah_row])
             saldo_df = pd.DataFrame([saldo_row])
-            final_df = pd.concat([filtered_df, saldo_df], ignore_index=True)
+            final_df = pd.concat([filtered_df, jumlah_df, saldo_df], ignore_index=True)
 
             # Tampilkan tabel
             st.dataframe(final_df)
