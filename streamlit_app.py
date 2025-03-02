@@ -69,7 +69,7 @@ if df is not None:
             unique_accounts
         )
 
-        # Slider untuk memilih bulan
+        # Slider untuk memilih rentang bulan
         months = [
             "Januari", "Februari", "Maret", "April", "Mei", "Juni",
             "Juli", "Agustus", "September", "Oktober", "November", "Desember"
@@ -79,7 +79,11 @@ if df is not None:
             "Mei": 5, "Juni": 6, "Juli": 7, "Agustus": 8,
             "September": 9, "Oktober": 10, "November": 11, "Desember": 12
         }
-        selected_month = st.select_slider("Pilih Bulan", options=months)
+        selected_month_range = st.select_slider(
+            "Pilih Rentang Bulan",
+            options=months,
+            value=("Januari", "Desember")  # Default: Januari hingga Desember
+        )
 
         # Terapkan filter
         filtered_df = df.copy()
@@ -92,9 +96,13 @@ if df is not None:
         if selected_units:
             filtered_df = filtered_df[filtered_df[selected_unit_type].isin(selected_units)]
 
-        # Filter berdasarkan bulan
-        selected_month_number = month_map[selected_month]
-        filtered_df = filtered_df[filtered_df['tgl_transaksi'].dt.month == selected_month_number]
+        # Filter berdasarkan rentang bulan
+        start_month = month_map[selected_month_range[0]]
+        end_month = month_map[selected_month_range[1]]
+        filtered_df = filtered_df[
+            (filtered_df['tgl_transaksi'].dt.month >= start_month) &
+            (filtered_df['tgl_transaksi'].dt.month <= end_month)
+        ]
 
         # Tampilkan hasil filter
         if not filtered_df.empty:
