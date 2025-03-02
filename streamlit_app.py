@@ -60,15 +60,38 @@ if df is not None:
 
         filters = {}
         for col in filter_columns:
-            unique_values = ["Semua"] + list(df[col].dropna().unique())
-            selected_value = st.selectbox(f"Pilih {col}", unique_values)
-            if selected_value != "Semua":
-                filters[col] = selected_value
+            unique_values = list(df[col].dropna().unique())
+            selected_values = st.multiselect(f"Pilih {col}", ["Semua"] + unique_values)
+            if "Semua" not in selected_values and selected_values:
+                filters[col] = selected_values
+
+        # Filter berdasarkan rentang debet dan kredit
+        st.subheader("Filter Berdasarkan Nilai Debet dan Kredit")
+        min_debet, max_debet = st.slider(
+            "Rentang Debet",
+            float(df["debet"].min()), float(df["debet"].max()),
+            (float(df["debet"].min()), float(df["debet"].max()))
+        )
+        min_kredit, max_kredit = st.slider(
+            "Rentang Kredit",
+            float(df["kredit"].min()), float(df["kredit"].max()),
+            (float(df["kredit"].min()), float(df["kredit"].max()))
+        )
 
         # Terapkan filter
         filtered_df = df.copy()
-        for col, value in filters.items():
-            filtered_df = filtered_df[filtered_df[col] == value]
+        for col, values in filters.items():
+            filtered_df = filtered_df[filtered_df[col].isin(values)]
+
+        # Terapkan filter untuk debet dan kredit
+        filtered_df = filtered_df[
+            (filtered_df["debet"] >= min_debet) & (filtered_df["debet"] <= max_debet) &
+            (filtered_df["kredit"] >= min_kredit) & (filtered_df["kredit"] <= max_kredit)
+        ]
+
+        # Tombol reset filter
+        if st.button("Reset Filter"):
+            filtered_df = df.copy()
 
         # Tampilkan hasil filter
         if not filtered_df.empty:
