@@ -53,9 +53,11 @@ if df is not None:
         # Tentukan nama akun berdasarkan level yang dipilih
         account_column = selected_level.replace("kd_", "nm_")  # Ubah kd_lv_X menjadi nm_lv_X
 
-        # Multiselect widget untuk memilih Nama Unit atau Sub Unit
+        # Radio button untuk memilih tipe unit (nm_unit atau nm_sub_unit)
         unit_options = ["nm_unit", "nm_sub_unit"]
         selected_unit_type = st.radio("Pilih Tipe Unit", unit_options)
+
+        # Multiselect widget untuk filter unit/sub unit
         unique_units = list(df[selected_unit_type].dropna().unique())
         selected_units = st.multiselect(
             f"Pilih {selected_unit_type}", 
