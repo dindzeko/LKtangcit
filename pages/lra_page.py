@@ -7,7 +7,7 @@ import io
 def load_data():
     try:
         # Baca file buku besar (.xlsb)
-        with open_workbook("data/buku_besar.xlsb") as wb:
+        with open_workbook("data/bukubesar.xlsb") as wb:
             with wb.get_sheet(1) as sheet:  # Asumsikan data berada di sheet pertama
                 buku_besar = pd.DataFrame(sheet.rows())
         
