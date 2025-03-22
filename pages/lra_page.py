@@ -9,7 +9,7 @@ def load_data():
         # Baca file buku besar (.xlsb)
         with open_workbook("data/bukubesar.xlsb") as wb:
             with wb.get_sheet(1) as sheet:  # Asumsikan data berada di sheet pertama
-                buku_besar = pd.DataFrame(sheet.rows())
+                bukubesar = pd.DataFrame(sheet.rows())
         
         # Pastikan header benar jika membaca dari .xlsb
         buku_besar.columns = buku_besar.iloc[0]  # Ambil baris pertama sebagai header
