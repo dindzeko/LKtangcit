@@ -1,4 +1,5 @@
 import pandas as pd
+import streamlit as st
 
 # Fungsi untuk memuat data
 def load_data():
@@ -8,7 +9,7 @@ def load_data():
         coa = pd.read_excel("data/coa.xlsx")
         return buku_besar, coa
     except Exception as e:
-        print(f"Error loading data: {e}")
+        st.error(f"Error loading data: {e}")
         return None, None
 
 # Fungsi untuk mengagregat data ke level 3
@@ -63,8 +64,10 @@ def generate_lra_report(aggregated, silpa):
 
     return lra_report
 
-# Main function
+# Main function untuk Streamlit
 def main():
+    st.title("Laporan Realisasi Anggaran (LRA)")
+
     # Load data
     buku_besar, coa = load_data()
     if buku_besar is None or coa is None:
@@ -82,9 +85,27 @@ def main():
     # Convert to DataFrame
     df_lra = pd.DataFrame(lra_report)
 
-    # Save to Excel
-    df_lra.to_excel("output/LRA_Report.xlsx", index=False, header=False)
-    print("LRA Report berhasil disimpan di output/LRA_Report.xlsx")
+    # Tampilkan laporan LRA
+    st.subheader("Laporan Realisasi Anggaran")
+    st.write("Berikut adalah laporan LRA yang telah dihasilkan:")
+    st.dataframe(df_lra)
+
+    # Opsi untuk mengunduh laporan sebagai file Excel
+    def convert_df_to_excel(df):
+        """Konversi DataFrame ke file Excel."""
+        output = io.BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            df.to_excel(writer, index=False, header=False)
+        output.seek(0)
+        return output
+
+    excel_file = convert_df_to_excel(df_lra)
+    st.download_button(
+        label="Download Laporan LRA sebagai Excel",
+        data=excel_file,
+        file_name="LRA_Report.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 
 if __name__ == "__main__":
     main()
