@@ -1,12 +1,29 @@
 import pandas as pd
+from pyxlsb import open_workbook
 import streamlit as st
+import io
 
 # Fungsi untuk memuat data
 def load_data():
     try:
-        # Baca file Excel
-        buku_besar = pd.read_excel("data/buku_besar.xlsx")
+        # Baca file buku besar (.xlsb)
+        with open_workbook("data/buku_besar.xlsb") as wb:
+            with wb.get_sheet(1) as sheet:  # Asumsikan data berada di sheet pertama
+                buku_besar = pd.DataFrame(sheet.rows())
+        
+        # Pastikan header benar jika membaca dari .xlsb
+        buku_besar.columns = buku_besar.iloc[0]  # Ambil baris pertama sebagai header
+        buku_besar = buku_besar[1:]  # Hapus baris header dari data
+        
+        # Konversi kolom ke tipe data yang sesuai (opsional, jika diperlukan)
+        buku_besar = buku_besar.apply(pd.to_numeric, errors='ignore')
+
+        # Baca file COA (.xlsx)
         coa = pd.read_excel("data/coa.xlsx")
+
+        # Bersihkan kolom 'Kode Akun' dari spasi atau karakter tambahan
+        coa['Kode Akun'] = coa['Kode Akun'].str.strip()
+
         return buku_besar, coa
     except Exception as e:
         st.error(f"Error loading data: {e}")
@@ -15,10 +32,17 @@ def load_data():
 # Fungsi untuk mengagregat data ke level 3
 def aggregate_to_level3(buku_besar, coa):
     # Gabungkan data dengan COA
-    merged = pd.merge(buku_besar, coa, left_on="kd_lv6", right_on="kd_lv6", how="left")
+    merged = pd.merge(
+        buku_besar,
+        coa,
+        left_on="kd_lv6",
+        right_on="Kode Akun",  # Kolom dalam file COA
+        how="left"
+    )
+    
     # Agregat ke level 3
     aggregated = (
-        merged.groupby(["kd_lv3", "nama_lv3"])
+        merged.groupby(["kd_lv3", "Nama Akun"])  # Gunakan kolom Nama Akun dari COA
         .agg({"debet": "sum", "kredit": "sum"})
         .reset_index()
     )
@@ -47,17 +71,59 @@ def generate_lra_report(aggregated, silpa):
     # Tambahkan PENDAPATAN
     lra_report.append(["", "", "", "", "", "1", "", "PENDAPATAN", "", "VI.1.1", "", "", ""])
     for _, row in aggregated[aggregated["kd_lv3"].str.startswith("4")].iterrows():
-        lra_report.append([row["kd_lv3"], "", "", "", "", "", "", row["nama_lv3"], "", "", row["debet"], row["kredit"], row["saldo"]])
+        lra_report.append([
+            row["kd_lv3"],
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            row["Nama Akun"],  # Gunakan Nama Akun dari COA
+            "",
+            "",
+            row["debet"],
+            row["kredit"],
+            row["saldo"]
+        ])
 
     # Tambahkan BELANJA
     lra_report.append(["", "", "", "", "", "2", "", "BELANJA", "", "VI.1.2", "", "", ""])
     for _, row in aggregated[aggregated["kd_lv3"].str.startswith("5")].iterrows():
-        lra_report.append([row["kd_lv3"], "", "", "", "", "", "", row["nama_lv3"], "", "", row["debet"], row["kredit"], row["saldo"]])
+        lra_report.append([
+            row["kd_lv3"],
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            row["Nama Akun"],  # Gunakan Nama Akun dari COA
+            "",
+            "",
+            row["debet"],
+            row["kredit"],
+            row["saldo"]
+        ])
 
     # Tambahkan PEMBIAYAAN
     lra_report.append(["", "", "", "", "", "4", "", "PEMBIAYAAN", "", "VI.1.5", "", "", ""])
     for _, row in aggregated[aggregated["kd_lv3"].str.startswith("6")].iterrows():
-        lra_report.append([row["kd_lv3"], "", "", "", "", "", "", row["nama_lv3"], "", "", row["debet"], row["kredit"], row["saldo"]])
+        lra_report.append([
+            row["kd_lv3"],
+            "",
+            "",
+            "",
+            "",
+            "",
+            "",
+            row["Nama Akun"],  # Gunakan Nama Akun dari COA
+            "",
+            "",
+            row["debet"],
+            row["kredit"],
+            row["saldo"]
+        ])
 
     # Tambahkan SILPA
     lra_report.append(["", "", "", "", "", "4.3", "", "SISA LEBIH PEMBIAYAAN ANGGARAN (SILPA)", "", "VI.1.6", "", "", silpa])
