@@ -209,6 +209,10 @@ def app():
             st.subheader("Saldo Akun")
             st.write(f"Saldo ({selected_akun}): Rp {saldo_akun:,.0f}")
             
+            # Generate nama file dinamis
+            unit_name = selected_skpd if selected_unit == "SKPD" else "All"
+            file_name = f"{unit_name}_{selected_level}_{selected_akun}.xlsx"
+            
             # Tampilkan hasil filter
             st.subheader("Hasil Filter")
             top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
@@ -226,7 +230,7 @@ def app():
             st.download_button(
                 "Unduh Excel",
                 data=output,
-                file_name="filtered_data.xlsx",
+                file_name=file_name,
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
             
