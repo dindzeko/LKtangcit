@@ -8,20 +8,54 @@ def app():
     # Baca file hanya sekali dan simpan di session state
     if "bukubesar" not in st.session_state:
         try:
-            st.session_state["bukubesar"] = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+            # Membaca file bukubesar.xlsb
+            st.session_state["bukubesar"] = pd.read_excel(
+                "data/bukubesar.xlsb",
+                engine="pyxlsb"
+            )
         except Exception as e:
             st.error(f"Gagal memuat data bukubesar: {str(e)}")
             return
 
     if "coa" not in st.session_state:
         try:
+            # Membaca file coa.xlsx
             st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
         except Exception as e:
             st.error(f"Gagal memuat data coa: {str(e)}")
             return
 
+    # Ambil DataFrame dari session state
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
+
+    # Perbaiki parsing kolom tgl_transaksi
+    try:
+        if "tgl_transaksi" in bukubesar.columns:
+            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
+            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"], 
+                    unit="D", 
+                    origin="1899-12-30"
+                )
+            else:
+                # Parsing tanggal dengan format dd/mm/yyyy
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"],
+                    format="%d/%m/%Y",
+                    errors="coerce"
+                )
+        else:
+            st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
+            return
+    except Exception as e:
+        st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
+        return
+
+    # Verifikasi hasil parsing tanggal
+    st.write("Contoh Tanggal Transaksi:")
+    st.write(bukubesar["tgl_transaksi"].head())
 
     # Inisialisasi session state untuk menyimpan daftar SKPD
     if "skpd_options" not in st.session_state:
@@ -133,7 +167,6 @@ def app():
             filtered_data = bukubesar.copy()
             
             # 1. Filter bulan
-            filtered_data["tgl_transaksi"] = pd.to_datetime(filtered_data["tgl_transaksi"], errors="coerce")
             bulan_condition = (
                 (filtered_data["tgl_transaksi"].dt.month >= selected_month[0]) &
                 (filtered_data["tgl_transaksi"].dt.month <= selected_month[1])
@@ -199,4 +232,5 @@ def app():
         except Exception as e:
             st.error(f"Terjadi kesalahan: {str(e)}")
 
+# Jalankan aplikasi
 app()
