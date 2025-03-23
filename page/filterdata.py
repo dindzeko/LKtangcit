@@ -203,14 +203,18 @@ def app():
             )
             
             # Hitung saldo akun
-            merged_data["Saldo"] = merged_data["debet"] - merged_data["kredit"]
+            saldo_akun = merged_data["debet"].sum() - merged_data["kredit"].sum()
             
-            # Tampilkan hasil
+            # Tampilkan saldo akun di atas tabel hasil filter
+            st.subheader("Saldo Akun")
+            st.write(f"Saldo ({selected_akun}): Rp {saldo_akun:,.0f}")
+            
+            # Tampilkan hasil filter
             st.subheader("Hasil Filter")
             top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
             display_data = merged_data.head(top_n)[[
                 "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit",
-                "kd_lv_6", "Nama Akun", "debet", "kredit", "Saldo", "uraian"
+                "kd_lv_6", "Nama Akun", "debet", "kredit", "uraian"
             ]]
             st.dataframe(display_data)
             
