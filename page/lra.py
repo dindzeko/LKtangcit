@@ -120,6 +120,5 @@ def app():
     # Kode inisialisasi data sama seperti sebelumnya
     # ...
     generate_lra()
-
-if __name__ == "__main__":
+    
     app()
