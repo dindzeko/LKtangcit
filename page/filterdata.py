@@ -1,6 +1,5 @@
-import streamlit as st
 import pandas as pd
-from io import BytesIO
+import streamlit as st
 
 def app():
     st.title("Filter Data Transaksi")
@@ -30,16 +29,21 @@ def app():
     # Menampilkan ringkasan data buku besar yang berhasil dibaca
     st.subheader("Ringkasan Data Buku Besar")
     try:
+        # Pastikan kolom debet dan kredit berisi nilai numerik
+        bukubesar["debet"] = pd.to_numeric(bukubesar["debet"], errors="coerce").fillna(0)
+        bukubesar["kredit"] = pd.to_numeric(bukubesar["kredit"], errors="coerce").fillna(0)
+
         # Hitung jumlah transaksi
         total_transactions = bukubesar["jns_transaksi"].count()
+
         # Hitung total debet dan kredit
         total_debet = bukubesar["debet"].sum()
         total_kredit = bukubesar["kredit"].sum()
 
         # Tampilkan hasil
         st.write(f"Jumlah Transaksi (Count): {total_transactions}")
-        st.write(f"Total Debet: Rp {total_debet:,.0f}")
-        st.write(f"Total Kredit: Rp {total_kredit:,.0f}")
+        st.write(f"Total Debet: {total_debet:,.0f}")
+        st.write(f"Total Kredit: {total_kredit:,.0f}")
     except Exception as e:
         st.error(f"Gagal menghitung ringkasan data buku besar: {str(e)}")
     
@@ -225,7 +229,7 @@ def app():
             
             # Tampilkan saldo akun di atas tabel hasil filter
             st.subheader("Saldo Akun")
-            st.write(f"Saldo ({selected_akun}): Rp {saldo_akun:,.0f}")
+            st.write(f"Saldo ({selected_akun}): {saldo_akun:,.0f}")
             
             # Generate nama file dinamis
             unit_name = selected_skpd if selected_unit == "SKPD" else "All"
