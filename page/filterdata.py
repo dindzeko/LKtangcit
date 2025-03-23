@@ -23,8 +23,13 @@ def app():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
 
+    # Pastikan kolom Kode Akun adalah string dan tangani nilai NaN
+    coa["Kode Akun"] = coa["Kode Akun"].fillna("").astype(str)
+
     # Fungsi untuk mengambil awalan kode akun berdasarkan Level
     def get_level_prefix(code, level):
+        if not code:  # Jika kode akun kosong
+            return ""
         parts = code.split(".")
         return ".".join(parts[:level])
 
