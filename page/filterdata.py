@@ -3,31 +3,19 @@ import pandas as pd
 from io import BytesIO
 
 def app():
-    st.title("Halaman Filter Data")
+    st.title("Filter Data Transaksi")
 
     # Load data
     try:
-        # Baca file bukubesar.xlsb dari folder data/
+        # Baca file bukubesar.xlsb (data transaksi)
         bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-        # Baca file coa.xlsx dari folder data/
+        # Baca file coa.xlsx (data COA untuk nama akun)
         coa = pd.read_excel("data/coa.xlsx")
         
-        # Membersihkan nama kolom dari spasi atau karakter khusus
-        bukubesar.columns = bukubesar.columns.str.replace(r"\s+", " ", regex=True).str.strip()
-        coa.columns = coa.columns.str.replace(r"\s+", " ", regex=True).str.strip()
-
         # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
         merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
-        return
-
-    # Cek kolom penting
-    required_columns = ["Level", "debet", "kredit", "jns_transaksi", "nm_unit"]
-    missing_columns = [col for col in required_columns if col not in merged_data.columns]
-    if missing_columns:
-        st.error(f"Kolom berikut tidak ditemukan dalam dataset: {', '.join(missing_columns)}. "
-                 "Pastikan file Excel memiliki kolom tersebut.")
         return
 
     # Pastikan kolom tgl_transaksi adalah datetime
@@ -38,7 +26,7 @@ def app():
         return
 
     # Widget filtering
-    st.subheader("Filtering Data")
+    st.subheader("Filter Data")
 
     # 1. Filter berdasarkan bulan
     st.write("Pilih Bulan:")
@@ -71,7 +59,7 @@ def app():
         selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
         filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
-    # 4. Filter berdasarkan Kode Level (select box)
+    # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
     st.write("Pilih Kode Level:")
     level_options = [f"Level {i}" for i in range(1, 7)]
     selected_level = st.selectbox("Kode Level", options=level_options)
@@ -82,7 +70,7 @@ def app():
         filtered_data["Level"].apply(lambda x: str(x).count(".") == target_level - 1)
     ]
 
-    # 5. Filter berdasarkan Debit/Kredit/All (tags)
+    # 5. Filter berdasarkan Debit/Kredit/All
     st.write("Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -96,6 +84,13 @@ def app():
     st.subheader("Hasil Filter")
     top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, max_value=100, value=20)
     display_data = filtered_data.head(top_n) if len(filtered_data) > top_n else filtered_data
+
+    # Hanya tampilkan kolom penting untuk pengguna
+    columns_to_display = [
+        "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit", "kd_lv_6", 
+        "Nama Akun", "debet", "kredit", "uraian"
+    ]
+    display_data = display_data[columns_to_display]
     st.dataframe(display_data)
 
     # Download hasil filter sebagai Excel
