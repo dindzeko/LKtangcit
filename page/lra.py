@@ -48,172 +48,73 @@ def generate_lra():
     def format_currency(value):
         return f"Rp {value:,.0f}" if pd.notnull(value) else "Rp 0"
     
-    # Fungsi rekursif untuk menghitung saldo hierarki
-    def calculate_hierarchy(parent_code, level, df_coa, df_transaksi):
-        """
-        Menghitung saldo akun secara rekursif berdasarkan hierarki kode akun.
-        """
-        # Pastikan parent_code tidak kosong
-        if not parent_code:
-            logging.error("Parent code kosong. Penghentian rekursi.")
-            return 0
-        
-        # Cari anak-anak di level berikutnya
-        children = df_coa[df_coa["Kode Akun"].str.startswith(parent_code + ".") & 
-                         (df_coa["Level"] == level + 1)]
-        
-        # Jika tidak ada anak, hentikan rekursi
-        if children.empty:
-            logging.debug(f"Tidak ada anak untuk parent_code: {parent_code}")
-            return 0
-        
-        total = 0
-        for _, child in children.iterrows():
-            child_code = child["Kode Akun"]
-            
-            if child["Level"] == 3:  # Level terendah (detail transaksi)
-                # Filter transaksi berdasarkan awalan kode akun
-                try:
-                    transaksi = df_transaksi[df_transaksi["kd_lv_6"].str.startswith(child_code)]
-                    saldo = transaksi["debet"].sum() - transaksi["kredit"].sum()
-                    logging.debug(f"Saldo untuk akun {child_code}: {saldo}")
-                except Exception as e:
-                    logging.error(f"Gagal menghitung saldo untuk akun {child_code}: {e}")
-                    saldo = 0
-            else:  # Rekursif untuk level di atasnya
-                saldo = calculate_hierarchy(child_code, child["Level"], df_coa, df_transaksi)
-            
-            total += saldo
-        
-        return total
-    
     # Membuat struktur LRA
     lra_data = []
     
     # ======================= PENDAPATAN =======================
+    # Level 1 Pendapatan
     pendapatan_l1 = coa[(coa["Kode Akun"].str.startswith("4")) & 
                        (coa["Level"] == 1)]
-    for _, row in pendapatan_l1.iterrows():
-        kode = row["Kode Akun"]
-        saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
-        logging.debug(f"Pendapatan Level 1 - Kode: {kode}, Saldo: {saldo}")
+    if not pendapatan_l1.empty:
+        total_pendapatan = pendapatan_l1.iloc[0]["Saldo"]  # Ambil saldo level 1
+        logging.debug(f"Total Pendapatan (Level 1): {total_pendapatan}")
         lra_data.append({
-            "Kode Rek": kode,
-            "Uraian": row["Nama Akun"],
-            "Saldo": saldo
+            "Kode Rek": pendapatan_l1.iloc[0]["Kode Akun"],
+            "Uraian": pendapatan_l1.iloc[0]["Nama Akun"],
+            "Saldo": total_pendapatan
         })
-        
-        # Level 2
-        pendapatan_l2 = coa[(coa["Kode Akun"].str.startswith(f"{kode}.")) & 
-                           (coa["Level"] == 2)]
-        for _, l2 in pendapatan_l2.iterrows():
-            saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
-            logging.debug(f"Pendapatan Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
-            lra_data.append({
-                "Kode Rek": l2["Kode Akun"],
-                "Uraian": l2["Nama Akun"],
-                "Saldo": saldo_l2
-            })
-            
-            # Level 3
-            pendapatan_l3 = coa[(coa["Kode Akun"].str.startswith(f'{l2["Kode Akun"]}.')) & 
-                               (coa["Level"] == 3)]
-            for _, l3 in pendapatan_l3.iterrows():
-                transaksi = bukubesar[bukubesar["kd_lv_6"].str.startswith(l3["Kode Akun"])]
-                saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
-                logging.debug(f"Pendapatan Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
-                lra_data.append({
-                    "Kode Rek": l3["Kode Akun"],
-                    "Uraian": l3["Nama Akun"],
-                    "Saldo": saldo_l3
-                })
+    else:
+        total_pendapatan = 0
+        logging.warning("Tidak ada data pendapatan level 1.")
     
     # ======================= BELANJA =======================
+    # Level 1 Belanja
     belanja_l1 = coa[(coa["Kode Akun"].str.startswith("5")) & 
                     (coa["Level"] == 1)]
-    for _, row in belanja_l1.iterrows():
-        kode = row["Kode Akun"]
-        saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
-        logging.debug(f"Belanja Level 1 - Kode: {kode}, Saldo: {saldo}")
+    if not belanja_l1.empty:
+        total_belanja = belanja_l1.iloc[0]["Saldo"]  # Ambil saldo level 1
+        logging.debug(f"Total Belanja (Level 1): {total_belanja}")
         lra_data.append({
-            "Kode Rek": kode,
-            "Uraian": row["Nama Akun"],
-            "Saldo": saldo
+            "Kode Rek": belanja_l1.iloc[0]["Kode Akun"],
+            "Uraian": belanja_l1.iloc[0]["Nama Akun"],
+            "Saldo": total_belanja
         })
-        
-        # Level 2
-        belanja_l2 = coa[(coa["Kode Akun"].str.startswith(f"{kode}.")) & 
-                        (coa["Level"] == 2)]
-        for _, l2 in belanja_l2.iterrows():
-            saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
-            logging.debug(f"Belanja Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
-            lra_data.append({
-                "Kode Rek": l2["Kode Akun"],
-                "Uraian": l2["Nama Akun"],
-                "Saldo": saldo_l2
-            })
-            
-            # Level 3
-            belanja_l3 = coa[(coa["Kode Akun"].str.startswith(f'{l2["Kode Akun"]}.')) & 
-                            (coa["Level"] == 3)]
-            for _, l3 in belanja_l3.iterrows():
-                transaksi = bukubesar[bukubesar["kd_lv_6"].str.startswith(l3["Kode Akun"])]
-                saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
-                logging.debug(f"Belanja Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
-                lra_data.append({
-                    "Kode Rek": l3["Kode Akun"],
-                    "Uraian": l3["Nama Akun"],
-                    "Saldo": saldo_l3
-                })
+    else:
+        total_belanja = 0
+        logging.warning("Tidak ada data belanja level 1.")
     
     # ======================= SURPLUS/DEFISIT =======================
-    surplus_defisit = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4")) - \
-                      sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5"))
+    surplus_defisit = total_pendapatan - total_belanja
     logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
     
     # ======================= PEMBIAYAAN =======================
+    # Level 1 Pembiayaan
     pembiayaan_l1 = coa[(coa["Kode Akun"].str.startswith("6")) & 
                        (coa["Level"] == 1)]
-    for _, row in pembiayaan_l1.iterrows():
-        kode = row["Kode Akun"]
-        saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
-        logging.debug(f"Pembiayaan Level 1 - Kode: {kode}, Saldo: {saldo}")
+    if not pembiayaan_l1.empty:
+        total_pembiayaan = pembiayaan_l1.iloc[0]["Saldo"]  # Ambil saldo level 1
+        logging.debug(f"Total Pembiayaan (Level 1): {total_pembiayaan}")
         lra_data.append({
-            "Kode Rek": kode,
-            "Uraian": row["Nama Akun"],
-            "Saldo": saldo
+            "Kode Rek": pembiayaan_l1.iloc[0]["Kode Akun"],
+            "Uraian": pembiayaan_l1.iloc[0]["Nama Akun"],
+            "Saldo": total_pembiayaan
         })
-        
-        # Level 2
-        pembiayaan_l2 = coa[(coa["Kode Akun"].str.startswith(f"{kode}.")) & 
-                           (coa["Level"] == 2)]
-        for _, l2 in pembiayaan_l2.iterrows():
-            saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
-            logging.debug(f"Pembiayaan Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
-            lra_data.append({
-                "Kode Rek": l2["Kode Akun"],
-                "Uraian": l2["Nama Akun"],
-                "Saldo": saldo_l2
-            })
-            
-            # Level 3
-            pembiayaan_l3 = coa[(coa["Kode Akun"].str.startswith(f'{l2["Kode Akun"]}.')) & 
-                               (coa["Level"] == 3)]
-            for _, l3 in pembiayaan_l3.iterrows():
-                transaksi = bukubesar[bukubesar["kd_lv_6"].str.startswith(l3["Kode Akun"])]
-                saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
-                logging.debug(f"Pembiayaan Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
-                lra_data.append({
-                    "Kode Rek": l3["Kode Akun"],
-                    "Uraian": l3["Nama Akun"],
-                    "Saldo": saldo_l3
-                })
+    else:
+        total_pembiayaan = 0
+        logging.warning("Tidak ada data pembiayaan level 1.")
     
     # ======================= SILPA/SIKPA =======================
-    silpa = surplus_defisit + sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6"))
-    logging.debug(f"SILPA/SIKPA: {silpa}")
-    lra_data.append({"Kode Rek": "", "Uraian": "SILPA/SIKPA", "Saldo": silpa})
+    silpa_sikpa = surplus_defisit - total_pembiayaan
+    logging.debug(f"SILPA/SIKPA: {silpa_sikpa}")
+    
+    # Tentukan label SILPA atau SIKPA berdasarkan nilai
+    if silpa_sikpa < 0:
+        uraian_silpa_sikpa = "SILPA"
+    else:
+        uraian_silpa_sikpa = "SIKPA"
+    
+    lra_data.append({"Kode Rek": "", "Uraian": uraian_silpa_sikpa, "Saldo": silpa_sikpa})
     
     # Membuat DataFrame hasil
     df_lra = pd.DataFrame(lra_data)
