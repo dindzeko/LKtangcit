@@ -162,7 +162,7 @@ def generate_lra():
     total_belanja_item = next((item for item in lra_data if item["Kode Rek"] == "5"), None)
     total_belanja = total_belanja_item["Saldo"] if total_belanja_item else 0
     
-    surplus_defisit = total_pendapatan - total_belanja
+    surplus_defisit = total_pendapatan + total_belanja
     logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
     
