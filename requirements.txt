@@ -5,3 +5,4 @@ openpyxl
 pyxlsb
 streamlit-option-menu
 XlsxWriter
+pyarrow
