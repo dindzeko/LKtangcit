@@ -5,20 +5,27 @@ from io import BytesIO
 def app():
     st.title("Filter Data Transaksi")
 
-    # Inisialisasi session state untuk menyimpan daftar SKPD
-    if "skpd_options" not in st.session_state:
+    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
+    if "level_options" not in st.session_state:
         try:
-            # Baca file bukubesar.xlsb hanya untuk mendapatkan daftar SKPD
-            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+            # Baca file coa.xlsx hanya untuk mendapatkan daftar akun berdasarkan level
+            coa = pd.read_excel("data/coa.xlsx")
             
-            # Pastikan kolom nm_unit ada dan tidak kosong
-            if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
-                raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
+            # Pastikan kolom Level ada dan tidak kosong
+            if "Level" not in coa.columns or coa["Level"].isnull().all():
+                raise ValueError("Kolom 'Level' tidak ditemukan atau kosong.")
             
-            skpd_options = list(bukubesar["nm_unit"].dropna().unique())
-            st.session_state["skpd_options"] = skpd_options
+            # Kelompokkan akun berdasarkan level (gunakan kolom Level secara langsung)
+            level_options = {}
+            for level in range(1, 7):
+                level_str = f"Level {level}"
+                level_options[level_str] = list(
+                    coa[coa["Level"] == level]["Nama Akun"].unique()
+                )
+            
+            st.session_state["level_options"] = level_options
         except Exception as e:
-            st.error(f"Gagal memuat daftar SKPD: {str(e)}")
+            st.error(f"Gagal memuat daftar akun: {str(e)}")
             return
 
     # Widget filtering
@@ -44,20 +51,27 @@ def app():
     unit_options = ["All", "SKPD"]
     selected_unit = st.radio("Unit", options=unit_options, index=0)
 
-    # Inisialisasi variabel untuk SKPD
-    selected_skpd = None
-
     if selected_unit == "SKPD":
-        # Tampilkan selectbox untuk memilih SKPD
-        if "skpd_options" in st.session_state and st.session_state["skpd_options"]:
-            selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
-        else:
-            st.warning("Daftar SKPD tidak tersedia. Silakan periksa file data.")
+        # Placeholder untuk nama SKPD (akan diisi nanti setelah data dimuat)
+        skpd_options = []
+        selected_skpd = None
 
     # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
     st.write("Pilih Kode Level:")
     level_options = [f"Level {i}" for i in range(1, 7)]
     selected_level = st.selectbox("Kode Level", options=level_options)
+
+    # Tampilkan selectbox untuk akun berdasarkan level yang dipilih
+    if selected_level:
+        # Pastikan session state level_options memiliki data untuk level yang dipilih
+        if selected_level in st.session_state["level_options"]:
+            akun_options = st.session_state["level_options"][selected_level]
+            if akun_options:  # Pastikan ada opsi akun
+                selected_akun = st.selectbox("Pilih Akun:", options=akun_options)
+            else:
+                st.warning(f"Tidak ada akun tersedia untuk {selected_level}.")
+        else:
+            st.warning(f"Tidak ada data akun untuk {selected_level}.")
 
     # 5. Filter berdasarkan Debit/Kredit/All
     st.write("Pilih Tipe Transaksi:")
@@ -93,11 +107,13 @@ def app():
                 # Ambil daftar SKPD unik dari data yang sudah difilter
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
-            # Filter berdasarkan Kode Level
-            target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
-            filtered_data = filtered_data[
-                filtered_data["Level"].apply(lambda x: str(x).count(".") == target_level - 1)
-            ]
+            # Filter berdasarkan Kode Level dan Akun
+            if selected_level and selected_akun:
+                target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
+                filtered_data = filtered_data[
+                    (filtered_data["Level"] == target_level) &  # Gunakan kolom Level secara langsung
+                    (filtered_data["Nama Akun"] == selected_akun)
+                ]
 
             # Filter berdasarkan Debit/Kredit/All
             if transaction_type == "Debet":
