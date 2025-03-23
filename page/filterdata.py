@@ -13,17 +13,19 @@ def app():
         coa = pd.read_excel("data/coa.xlsx")
         
         # Membersihkan nama kolom dari spasi atau karakter khusus
-        bukubesar.columns = bukubesar.columns.str.strip()
-        coa.columns = coa.columns.str.strip()
+        bukubesar.columns = bukubesar.columns.str.replace(r"\s+", " ", regex=True).str.strip()
+        coa.columns = coa.columns.str.replace(r"\s+", " ", regex=True).str.strip()
+
+        # Debugging: Cek nama kolom sebelum merge
+        st.write("Nama kolom di bukubesar:", bukubesar.columns.tolist())
+        st.write("Nama kolom di coa:", coa.columns.tolist())
 
         # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
         merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
+        st.write("Nama kolom setelah merge:", merged_data.columns.tolist())
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
         return
-
-    # Cek nama kolom di DataFrame
-    st.write("Nama kolom di dataset:", merged_data.columns.tolist())
 
     # Pastikan kolom tgl_transaksi adalah datetime
     try:
