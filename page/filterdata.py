@@ -82,36 +82,15 @@ def app():
     level_options = [f"Level {i}" for i in range(1, 7)]
     selected_level = st.selectbox("Kode Level", options=level_options)
 
-    # Tambahkan filter berdasarkan kategori akun
-    st.write("Pilih Kategori Akun:")
-    kategori_akun = {
-        "PENDAPATAN DAERAH-LO": "7",
-        "BEBAN DAERAH-LO": "8",
-        "PENDAPATAN DAERAH": "4",
-        "BELANJA DAERAH": "5",
-        "PEMBIAYAAN DAERAH": "6",
-        "ASET": "1",
-        "KEWAJIBAN": "2",
-        "EKUITAS": "3"
-    }
-    selected_kategori = st.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
-
-    # Tampilkan selectbox untuk akun berdasarkan level dan kategori yang dipilih
+    # Tampilkan selectbox untuk akun berdasarkan level yang dipilih
     if selected_level:
         # Pastikan session state level_options memiliki data untuk level yang dipilih
         if selected_level in st.session_state["level_options"]:
-            # Filter akun berdasarkan kategori (awalan kode akun)
-            coa = pd.read_excel("data/coa.xlsx")
-            target_kategori_awalan = kategori_akun[selected_kategori]
-            filtered_akun = coa[
-                (coa["Level"] == int(selected_level.split()[-1])) &  # Sesuaikan dengan level
-                (coa["Kode Akun"].astype(str).str.startswith(target_kategori_awalan))  # Sesuaikan dengan kategori
-            ]["Nama Akun"].unique()
-
-            if len(filtered_akun) > 0:  # Pastikan ada opsi akun
-                selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
+            akun_options = st.session_state["level_options"][selected_level]
+            if akun_options:  # Pastikan ada opsi akun
+                selected_akun = st.selectbox("Pilih Akun:", options=akun_options)
             else:
-                st.warning(f"Tidak ada akun tersedia untuk {selected_level} dan kategori {selected_kategori}.")
+                st.warning(f"Tidak ada akun tersedia untuk {selected_level}.")
         else:
             st.warning(f"Tidak ada data akun untuk {selected_level}.")
 
@@ -195,5 +174,3 @@ def app():
 
 # Panggil fungsi app
 app()
-untuk filtering aplikasi berjalan works. tapi apakah ada yang harus kita perbaiki agar aplikasi dapat cepat mengkalkulasi 
-untuk diketahui data bukubesar memang agak besr filenya 20an mb . dengan tranaksis mencapi 500an rb row .
