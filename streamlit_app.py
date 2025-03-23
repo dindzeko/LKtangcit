@@ -32,6 +32,7 @@ add_css(css_styles)
 # Impor modul-modul halaman dari folder `page/`
 try:
     from page.filterdata import app as filter_data_app
+     from page.lra import app as lra_app
 except ImportError as e:
     st.error(f"Error importing modules: {str(e)}")
     st.stop()
