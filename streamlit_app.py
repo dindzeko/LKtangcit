@@ -5,7 +5,7 @@ from streamlit_option_menu import option_menu
 def add_css(css):
     st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
 
-# CSS styling (kosongkan dulu untuk fokus perbaikan tampilan)
+# CSS styling
 css_styles = """
 <style>
 /* Styling untuk judul utama */
@@ -33,6 +33,9 @@ add_css(css_styles)
 try:
     from page.filterdata import app as filter_data_app
     from page.lra import app as lra_app
+    from page.neraca import app as neraca_app
+    from page.lo import app as lo_app
+    from page.prosedur_analitis import app as prosedur_analitis_app
 except ImportError as e:
     st.error(f"Error importing modules: {str(e)}")
     st.stop()
