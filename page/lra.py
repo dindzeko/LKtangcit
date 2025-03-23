@@ -29,10 +29,6 @@ def generate_lra():
         st.error(f"Kolom berikut harus ada di 'coa': {required_columns_coa}")
         return
     
-    # Normalisasi format kode akun
-    bukubesar["kd_lv_6"] = bukubesar["kd_lv_6"].str.strip()
-    coa["Kode Akun"] = coa["Kode Akun"].str.strip()
-    
     # Filter bukubesar untuk menghilangkan "Jurnal Penutup"
     if "jns_transaksi" in bukubesar.columns:
         bukubesar = bukubesar[bukubesar["jns_transaksi"] != "Jurnal Penutup"]
@@ -40,28 +36,17 @@ def generate_lra():
         st.error("Kolom 'jns_transaksi' tidak ditemukan di DataFrame 'bukubesar'.")
         return
     
-    # Fungsi untuk membersihkan kolom numerik
-    def clean_numeric_column(column):
-        return pd.to_numeric(
-            column.astype(str)
-                .str.replace("Rp", "", regex=True)
-                .str.replace(",", "", regex=True)
-                .str.strip(),
-            errors="coerce"
-        ).fillna(0)
-    
-    # Bersihkan kolom 'debet' dan 'kredit'
-    bukubesar["debet"] = clean_numeric_column(bukubesar["debet"])
-    bukubesar["kredit"] = clean_numeric_column(bukubesar["kredit"])
+    # Konversi kolom 'debet' dan 'kredit' ke numerik
+    bukubesar["debet"] = pd.to_numeric(bukubesar["debet"], errors="coerce").fillna(0)
+    bukubesar["kredit"] = pd.to_numeric(bukubesar["kredit"], errors="coerce").fillna(0)
     
     # Fungsi untuk format mata uang
     def format_currency(value):
         return f"Rp {value:,.0f}" if pd.notnull(value) else "Rp 0"
 
     # Fungsi rekursif untuk menghitung saldo hierarki
-    def calculate_hierarchy(parent_code, level, df_coa, df_transaksi):
-        children = df_coa[df_coa["Kode Akun"].str.startswith(parent_code + ".") & 
-                         (df_coa["Level"] == level + 1)]
+    def calculate_hierarchy(parent_code, df_coa, df_transaksi):
+        children = df_coa[df_coa["Kode Akun"].str.startswith(parent_code + ".")]
         
         total = 0
         for _, child in children.iterrows():
@@ -71,7 +56,7 @@ def generate_lra():
                 saldo = transaksi["debet"].sum() - transaksi["kredit"].sum()
                 logging.debug(f"Saldo untuk akun {child_code}: {saldo}")
             else:  # Rekursif untuk level di atasnya
-                saldo = calculate_hierarchy(child_code, child["Level"], df_coa, df_transaksi)
+                saldo = calculate_hierarchy(child_code, df_coa, df_transaksi)
             total += saldo
         return total
 
@@ -81,13 +66,13 @@ def generate_lra():
     # ======================= PENDAPATAN =======================
     pendapatan_l1 = coa[(coa["Kode Akun"].str.startswith("4")) & (coa["Level"] == 1)]
     for _, row in pendapatan_l1.iterrows():
-        saldo = calculate_hierarchy(row["Kode Akun"], 1, coa, bukubesar)
+        saldo = calculate_hierarchy(row["Kode Akun"], coa, bukubesar)
         lra_data.append({
             "Kode Rek": row["Kode Akun"],
             "Uraian": row["Nama Akun"],
             "Saldo": saldo
         })
-    
+
     # Total Pendapatan
     total_pendapatan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4"))
     lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total pendapatan", "Saldo": total_pendapatan})
@@ -95,13 +80,13 @@ def generate_lra():
     # ======================= BELANJA =======================
     belanja_l1 = coa[(coa["Kode Akun"].str.startswith("5")) & (coa["Level"] == 1)]
     for _, row in belanja_l1.iterrows():
-        saldo = calculate_hierarchy(row["Kode Akun"], 1, coa, bukubesar)
+        saldo = calculate_hierarchy(row["Kode Akun"], coa, bukubesar)
         lra_data.append({
             "Kode Rek": row["Kode Akun"],
             "Uraian": row["Nama Akun"],
             "Saldo": saldo
         })
-    
+
     # Total Belanja
     total_belanja = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5"))
     lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total belanja", "Saldo": total_belanja})
@@ -113,13 +98,13 @@ def generate_lra():
     # ======================= PEMBIAYAAN =======================
     pembiayaan_l1 = coa[(coa["Kode Akun"].str.startswith("6")) & (coa["Level"] == 1)]
     for _, row in pembiayaan_l1.iterrows():
-        saldo = calculate_hierarchy(row["Kode Akun"], 1, coa, bukubesar)
+        saldo = calculate_hierarchy(row["Kode Akun"], coa, bukubesar)
         lra_data.append({
             "Kode Rek": row["Kode Akun"],
             "Uraian": row["Nama Akun"],
             "Saldo": saldo
         })
-    
+
     # Total Pembiayaan
     total_pembiayaan_penerimaan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.1"))
     total_pembiayaan_pengeluaran = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.2"))
