@@ -25,6 +25,14 @@ def app():
         st.error(f"Gagal mengonversi kolom tgl_transaksi ke datetime: {str(e)}")
         return
 
+    # Cek kolom penting
+    required_columns = ["Level", "debet", "kredit"]
+    missing_columns = [col for col in required_columns if col not in merged_data.columns]
+    if missing_columns:
+        st.error(f"Kolom berikut tidak ditemukan dalam dataset: {', '.join(missing_columns)}. "
+                 "Pastikan file Excel memiliki kolom tersebut.")
+        return
+
     # Widget filtering
     st.subheader("Filtering Data")
 
@@ -64,8 +72,14 @@ def app():
     st.write("Pilih Tipe Transaksi:")
     transaction_type = st.radio("Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True)
     if transaction_type == "Debet":
+        if "debet" not in filtered_data.columns:
+            st.error("Kolom 'debet' tidak ditemukan dalam dataset.")
+            return
         filtered_data = filtered_data[filtered_data["debet"] > 0]
     elif transaction_type == "Kredit":
+        if "kredit" not in filtered_data.columns:
+            st.error("Kolom 'kredit' tidak ditemukan dalam dataset.")
+            return
         filtered_data = filtered_data[filtered_data["kredit"] > 0]
 
     # Display hasil filter
