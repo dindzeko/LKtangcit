@@ -5,24 +5,29 @@ from streamlit_option_menu import option_menu
 def add_css(css):
     st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
 
-# CSS styling (kosongkan dulu untuk fokus perbaikan fungsional)
-css_styles = ""
+# CSS styling (kosongkan dulu untuk fokus perbaikan tampilan)
+css_styles = """
+<style>
+/* Styling untuk judul utama */
+h1 {
+    font-size: 2.5rem;
+    color: #333;
+}
+
+/* Styling untuk deskripsi */
+p {
+    font-size: 1.2rem;
+    color: #555;
+}
+
+/* Styling untuk sidebar */
+.sidebar .sidebar-content {
+    padding: 20px;
+    background-color: #f9f9f9;
+}
+</style>
+"""
 add_css(css_styles)
-
-# Impor modul-modul halaman dari folder `pages/`
-try:
-    from pages.filterdata import app as filter_data_app
-    from pages.lra import app as lra_app
-    from pages.neraca import app as neraca_app
-    from pages.lo import app as lo_app
-    from pages.prosedur_analitis import app as prosedur_analitis_app
-except ImportError as e:
-    st.error(f"Error importing modules: {str(e)}")
-    st.stop()
-
-# Inisialisasi session state
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "Main Page"
 
 # ----------- HALAMAN UTAMA -----------
 def main_page():
@@ -42,27 +47,27 @@ def main_page():
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
     st.title("Halaman Filter Data")
-    filter_data_app()
+    st.write("Ini adalah halaman untuk memfilter data transaksi.")
 
 # ----------- HALAMAN LRA -----------
 def lra_page():
     st.title("Halaman LRA")
-    lra_app()
+    st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
 
 # ----------- HALAMAN NERACA -----------
 def neraca_page():
     st.title("Halaman Neraca")
-    neraca_app()
+    st.write("Ini adalah halaman untuk Laporan Neraca.")
 
 # ----------- HALAMAN LO -----------
 def lo_page():
     st.title("Halaman LO")
-    lo_app()
+    st.write("Ini adalah halaman untuk Laporan Operasional (LO).")
 
 # ----------- HALAMAN PROSEDUR ANALITIS -----------
 def prosedur_analitis_page():
     st.title("Halaman Prosedur Analitis")
-    prosedur_analitis_app()
+    st.write("Ini adalah halaman untuk melakukan analisis prosedural.")
 
 # ----------- KONFIGURASI NAVIGASI -----------
 page_config = {
