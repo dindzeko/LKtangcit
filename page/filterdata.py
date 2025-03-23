@@ -152,9 +152,12 @@ def app():
             # Filter berdasarkan Kode Level dan Akun
             if selected_level and selected_akun:
                 target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
+                
+                # Filter berdasarkan level dan kategori akun
+                target_kategori_awalan = kategori_akun[selected_kategori]
                 filtered_data = filtered_data[
-                    (filtered_data["Level"] == target_level) &  # Gunakan kolom Level secara langsung
-                    (filtered_data["Nama Akun"] == selected_akun)
+                    (merged_data["kd_lv_6"].astype(str).str.startswith(target_kategori_awalan)) &
+                    (merged_data["Nama Akun"] == selected_akun)
                 ]
 
             # Filter berdasarkan Debit/Kredit/All
