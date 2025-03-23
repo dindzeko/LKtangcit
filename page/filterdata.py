@@ -7,79 +7,100 @@ def app():
 
     # Load data
     try:
-        # Baca file bukubesar.xlsb dari folder data/
-        bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-        # Baca file coa.xlsx dari folder data/
+        # Baca dan proses data COA
         coa = pd.read_excel("data/coa.xlsx")
         
-        # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
-        merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
+        # Proses split kode akun menjadi level 1-6
+        coa_level6 = coa[coa['Level'] == 6].copy()
+        coa_level6['kode_split'] = coa_level6['Kode Akun'].apply(lambda x: x.split('.'))
+        for i in range(1, 7):
+            coa_level6[f'level_{i}'] = coa_level6['kode_split'].apply(
+                lambda parts: '.'.join(parts[:i]) if len(parts) >= i else ''
+        
+        # Baca dan gabung data bukubesar
+        bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+        merged_data = pd.merge(
+            bukubesar,
+            coa_level6[['Kode Akun'] + [f'level_{i}' for i in range(1,7)]],
+            left_on="kd_lv_6",
+            right_on="Kode Akun",
+            how="left"
+        )
+        
+        # Konversi ke datetime
+        merged_data['tgl_transaksi'] = pd.to_datetime(merged_data['tgl_transaksi'], errors='coerce')
+        
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
         return
 
-    # Pastikan kolom tgl_transaksi adalah datetime
-    try:
-        merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
-    except Exception as e:
-        st.error(f"Gagal mengonversi kolom tgl_transaksi ke datetime: {str(e)}")
-        return
+    # Widget filtering ---------------------------------------------------------
 
-    # Widget filtering
-    st.subheader("Filtering Data")
-
-    # 1. Filter berdasarkan bulan
+    # 1. Filter bulan (perbaikan format tanggal)
     st.write("Pilih Bulan:")
-    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
+    selected_month = st.slider(
+        "Bulan Transaksi",
+        min_value=1, 
+        max_value=12,
+        value=(1, 12)
+    )
+    
+    # Filter data
     filtered_data = merged_data[
-        (merged_data["tgl_transaksi"].dt.month >= selected_month[0]) &
-        (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
+        (merged_data['tgl_transaksi'].dt.month >= selected_month[0]) & 
+        (merged_data['tgl_transaksi'].dt.month <= selected_month[1])
     ]
 
-    # 2. Filter berdasarkan jns_transaksi (multiselect)
+    # 2. Filter jenis transaksi
     st.write("Pilih Jenis Transaksi:")
-    jenis_transaksi_options = list(filtered_data["jns_transaksi"].unique())
-    selected_jenis_transaksi = st.multiselect("Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options)
-    filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+    jenis_options = filtered_data['jns_transaksi'].unique().tolist()
+    selected_jenis = st.multiselect(
+        "Jenis Transaksi",
+        options=jenis_options,
+        default=jenis_options
+    )
+    filtered_data = filtered_data[filtered_data['jns_transaksi'].isin(selected_jenis)]
 
-    # 3. Filter berdasarkan nm_unit (segmented control)
+    # 3. Filter unit
     st.write("Pilih Unit:")
-    unit_options = ["All"] + list(filtered_data["nm_unit"].unique())
-    selected_unit = st.radio("Unit", options=unit_options, index=0)
+    unit_options = ["All"] + filtered_data['nm_unit'].unique().tolist()
+    selected_unit = st.radio("Unit", options=unit_options)
     if selected_unit != "All":
-        filtered_data = filtered_data[filtered_data["nm_unit"] == selected_unit]
+        filtered_data = filtered_data[filtered_data['nm_unit'] == selected_unit]
 
-    # 4. Filter berdasarkan Kode Level (select box)
-    st.write("Pilih Kode Level:")
-    level_options = [f"Level {i}" for i in range(1, 7)]
-    selected_level = st.selectbox("Kode Level", options=level_options)
-    level_column = f"Level {selected_level.split()[-1]}"  # Ambil angka dari string "Level X"
-    filtered_data = filtered_data.dropna(subset=[level_column])
+    # 4. Filter level kode (perbaikan nama kolom)
+    st.write("Pilih Level Kode Akun:")
+    level_options = [1,2,3,4,5,6]
+    selected_level = st.selectbox("Level", options=level_options)
+    
+    if f'level_{selected_level}' in filtered_data.columns:
+        level_values = filtered_data[f'level_{selected_level}'].dropna().unique().tolist()
+        selected_code = st.selectbox(f"Kode Level {selected_level}", options=level_values)
+        filtered_data = filtered_data[filtered_data[f'level_{selected_level}'] == selected_code]
+    else:
+        st.warning("Data level tidak tersedia")
 
-    # 5. Filter berdasarkan Debit/Kredit/All (pills)
+    # 5. Filter debit/kredit
     st.write("Pilih Tipe Transaksi:")
-    transaction_type = st.radio("Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True)
-    if transaction_type == "Debet":
-        filtered_data = filtered_data[filtered_data["debet"] > 0]
-    elif transaction_type == "Kredit":
-        filtered_data = filtered_data[filtered_data["kredit"] > 0]
+    dk_type = st.radio("Tipe", options=["All", "Debet", "Kredit"], horizontal=True)
+    if dk_type == "Debet":
+        filtered_data = filtered_data[filtered_data['debet'] > 0]
+    elif dk_type == "Kredit":
+        filtered_data = filtered_data[filtered_data['kredit'] > 0]
 
-    # Display hasil filter
+    # Tampilkan hasil ----------------------------------------------------------
     st.subheader("Hasil Filter")
-    top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, max_value=100, value=20)
-    display_data = filtered_data.head(top_n) if len(filtered_data) > top_n else filtered_data
-    st.dataframe(display_data)
+    top_n = st.number_input("Jumlah Baris", min_value=1, value=20)
+    st.dataframe(filtered_data.head(top_n))
 
-    # Download hasil filter sebagai Excel
-    st.subheader("Download Hasil Filter")
-    if st.button("Download Excel"):
+    # Download button
+    if not filtered_data.empty:
         output = BytesIO()
-        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-            display_data.to_excel(writer, index=False, sheet_name="Filtered Data")
-        output.seek(0)
+        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+            filtered_data.to_excel(writer, index=False)
         st.download_button(
-            label="Unduh File Excel",
-            data=output,
+            "Download Excel",
+            data=output.getvalue(),
             file_name="filtered_data.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
