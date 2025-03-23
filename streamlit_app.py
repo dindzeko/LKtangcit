@@ -1,6 +1,13 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
+# Impor modul untuk halaman Filter Data
+try:
+    from filterdata import app as filter_data_app  # Mengimpor fungsi app dari filterdata.py
+except ImportError as e:
+    st.error(f"Error importing modules: {str(e)}")
+    st.stop()
+
 # ----------- HALAMAN UTAMA -----------
 def main_page():
     st.title("Selamat Datang!")
@@ -18,14 +25,8 @@ def main_page():
 
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
-    st.title("Halaman Filter Data")
-    st.write("Ini adalah halaman untuk memfilter data transaksi.")
-    uploaded_file = st.file_uploader("Unggah file CSV", type=["csv"])
-    if uploaded_file is not None:
-        st.success("File berhasil diunggah!")
-        # Contoh: Tampilkan preview data (akan ditambahkan nanti)
-        st.write("Preview data:")
-        st.write(uploaded_file)
+    # Panggil fungsi app dari filterdata.py
+    filter_data_app()
 
 # ----------- HALAMAN LRA -----------
 def lra_page():
