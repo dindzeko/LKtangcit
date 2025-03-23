@@ -12,11 +12,18 @@ def app():
         # Baca file coa.xlsx dari folder data/
         coa = pd.read_excel("data/coa.xlsx")
         
+        # Membersihkan nama kolom dari spasi atau karakter khusus
+        bukubesar.columns = bukubesar.columns.str.strip()
+        coa.columns = coa.columns.str.strip()
+
         # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
         merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
         return
+
+    # Cek nama kolom di DataFrame
+    st.write("Nama kolom di dataset:", merged_data.columns.tolist())
 
     # Pastikan kolom tgl_transaksi adalah datetime
     try:
