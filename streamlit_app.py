@@ -29,6 +29,17 @@ p {
 """
 add_css(css_styles)
 
+# Impor modul-modul halaman dari folder `page/`
+try:
+    from page.filterdata import app as filter_data_app
+    from page.lra import app as lra_app
+    from page.neraca import app as neraca_app
+    from page.lo import app as lo_app
+    from page.prosedur_analitis import app as prosedur_analitis_app
+except ImportError as e:
+    st.error(f"Error importing modules: {str(e)}")
+    st.stop()
+
 # ----------- HALAMAN UTAMA -----------
 def main_page():
     st.title("Selamat Datang!")
@@ -47,27 +58,27 @@ def main_page():
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
     st.title("Halaman Filter Data")
-    st.write("Ini adalah halaman untuk memfilter data transaksi.")
+    filter_data_app()
 
 # ----------- HALAMAN LRA -----------
 def lra_page():
     st.title("Halaman LRA")
-    st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
+    lra_app()
 
 # ----------- HALAMAN NERACA -----------
 def neraca_page():
     st.title("Halaman Neraca")
-    st.write("Ini adalah halaman untuk Laporan Neraca.")
+    neraca_app()
 
 # ----------- HALAMAN LO -----------
 def lo_page():
     st.title("Halaman LO")
-    st.write("Ini adalah halaman untuk Laporan Operasional (LO).")
+    lo_app()
 
 # ----------- HALAMAN PROSEDUR ANALITIS -----------
 def prosedur_analitis_page():
     st.title("Halaman Prosedur Analitis")
-    st.write("Ini adalah halaman untuk melakukan analisis prosedural.")
+    prosedur_analitis_app()
 
 # ----------- KONFIGURASI NAVIGASI -----------
 page_config = {
