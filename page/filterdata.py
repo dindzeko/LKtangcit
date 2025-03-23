@@ -23,16 +23,10 @@ def app():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
 
-    # Tambahkan kolom untuk setiap level berdasarkan hierarki kode akun
-    def add_hierarchy_columns(coa):
-        coa["Level 1"] = coa["Kode Akun"].astype(str).str.split(".").str[0]  # Ambil awalan Level 1
-        coa["Level 2"] = coa["Kode Akun"].astype(str).str.split(".").str[:2].str.join(".")  # Ambil awalan Level 2
-        coa["Level 3"] = coa["Kode Akun"].astype(str).str.split(".").str[:3].str.join(".")  # Ambil awalan Level 3
-        coa["Level 4"] = coa["Kode Akun"].astype(str).str.split(".").str[:4].str.join(".")  # Ambil awalan Level 4
-        coa["Level 5"] = coa["Kode Akun"].astype(str).str.split(".").str[:5].str.join(".")  # Ambil awalan Level 5
-        return coa
-
-    coa = add_hierarchy_columns(coa)
+    # Fungsi untuk mengambil awalan kode akun berdasarkan Level
+    def get_level_prefix(code, level):
+        parts = code.split(".")
+        return ".".join(parts[:level])
 
     # Widget filtering
     st.subheader("Filter Data")
@@ -93,15 +87,16 @@ def app():
 
     # Tampilkan selectbox untuk akun berdasarkan level yang dipilih
     if selected_level:
-        target_level_column = f"Level {selected_level.split()[-1]}"  # Ambil kolom level yang dipilih
+        target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
         filtered_akun = coa[
-            coa[target_level_column].astype(str).str.startswith(kategori_akun[selected_kategori])
+            coa["Kode Akun"].apply(lambda x: get_level_prefix(x, target_level)).str.startswith(kategori_akun[selected_kategori])
         ]["Nama Akun"].unique()
 
         if len(filtered_akun) > 0:
             selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
         else:
             st.warning(f"Tidak ada akun tersedia untuk {selected_level} dan kategori {selected_kategori}.")
+            return
 
     st.markdown("---")
 
@@ -132,9 +127,9 @@ def app():
 
             # 4. Filter berdasarkan Level dan Akun
             if selected_level and selected_akun:
-                target_level_column = f"Level {selected_level.split()[-1]}"
+                target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
                 conditions.append(
-                    (merged_data[target_level_column] == selected_akun)
+                    merged_data["Kode Akun"].apply(lambda x: get_level_prefix(x, target_level)) == selected_akun
                 )
 
             # Gabungkan semua kondisi dengan operator AND
@@ -157,6 +152,20 @@ def app():
             ]
             display_data = display_data[columns_to_display]
             st.dataframe(display_data)
+
+            # Download hasil filter sebagai Excel
+            st.subheader("Download Hasil Filter")
+            if st.button("Download Excel"):
+                output = BytesIO()
+                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                    display_data.to_excel(writer, index=False, sheet_name="Filtered Data")
+                output.seek(0)
+                st.download_button(
+                    label="Unduh File Excel",
+                    data=output,
+                    file_name="filtered_data.xlsx",
+                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                )
 
         except Exception as e:
             st.error(f"Gagal memuat atau memproses data: {str(e)}")
