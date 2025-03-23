@@ -1,197 +1,231 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from io import BytesIO
+from functools import lru_cache
 
-def app():
-    st.title("Filter Data Transaksi")
+# Konfigurasi awal
+DATA_PATH = {
+    'bukubesar': "data/bukubesar.xlsb",
+    'coa': "data/coa.xlsx"
+}
 
-    # Inisialisasi session state untuk menyimpan daftar SKPD
-    if "skpd_options" not in st.session_state:
-        try:
-            # Baca file bukubesar.xlsb hanya untuk mendapatkan daftar SKPD
-            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-            
-            # Pastikan kolom nm_unit ada dan tidak kosong
-            if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
-                raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
-            
-            skpd_options = list(bukubesar["nm_unit"].dropna().unique())
-            st.session_state["skpd_options"] = skpd_options
-        except Exception as e:
-            st.error(f"Gagal memuat daftar SKPD: {str(e)}")
+@st.cache_data(ttl=3600, show_spinner="Memuat data...")
+def load_and_preprocess():
+    """Muat dan praproses data dengan optimasi memori"""
+    try:
+        # 1. Load data dengan tipe data spesifik
+        dtype_bukubesar = {
+            'no_bukti': 'category',
+            'jns_transaksi': 'category',
+            'nm_unit': 'category',
+            'kd_lv_6': 'category',
+            'uraian': 'category'
+        }
+        
+        # Baca file besar dengan chunksize jika diperlukan
+        bukubesar = pd.read_excel(
+            DATA_PATH['bukubesar'],
+            engine='pyxlsb',
+            dtype=dtype_bukubesar,
+            parse_dates=['tgl_transaksi']
+        )
+        
+        # 2. Proses data COA
+        coa = pd.read_excel(
+            DATA_PATH['coa'],
+            dtype={'Kode Akun': 'category', 'Level': 'int8'}
+        )
+        
+        # Praproses level kode akun
+        coa_level6 = coa[coa['Level'] == 6].copy()
+        split_codes = coa_level6['Kode Akun'].str.split('.', expand=True)
+        for i in range(6):
+            coa_level6[f'level_{i+1}'] = split_codes.iloc[:, :i+1].agg('.'.join, axis=1)
+        
+        # 3. Gabungkan data
+        merged = pd.merge(
+            bukubesar,
+            coa_level6[['Kode Akun', 'Nama Akun'] + [f'level_{i+1}' for i in range(6)]],
+            left_on='kd_lv_6',
+            right_on='Kode Akun',
+            how='left'
+        )
+        
+        # 4. Optimasi memori
+        numeric_cols = ['debet', 'kredit']
+        merged[numeric_cols] = merged[numeric_cols].apply(pd.to_numeric, downcast='float')
+        
+        # Buat indeks untuk kolom yang sering difilter
+        merged.set_index('tgl_transaksi', inplace=True)
+        
+        return merged
+    
+    except Exception as e:
+        st.error(f"Gagal memuat data: {str(e)}")
+        return pd.DataFrame()
+
+def create_filters(df):
+    """Buat UI komponen filter"""
+    filters = {}
+    
+    with st.sidebar:
+        st.header("Parameter Filter")
+        
+        # 1. Filter rentang tanggal
+        min_date = df.index.min().date()
+        max_date = df.index.max().date()
+        date_range = st.date_input(
+            "Rentang Tanggal",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date
+        )
+        filters['start_date'] = pd.Timestamp(date_range[0])
+        filters['end_date'] = pd.Timestamp(date_range[1])
+        
+        # 2. Filter jenis transaksi
+        jns_options = df['jns_transaksi'].cat.categories.tolist()
+        filters['jns_transaksi'] = st.multiselect(
+            "Jenis Transaksi",
+            options=jns_options,
+            default=jns_options,
+            max_selections=5
+        )
+        
+        # 3. Filter unit
+        unit_options = ['All'] + df['nm_unit'].cat.categories.tolist()
+        filters['unit'] = st.selectbox(
+            "Unit/SKPD",
+            options=unit_options,
+            index=0
+        )
+        
+        # 4. Filter level akun
+        level_options = [f"Level {i+1}" for i in range(6)]
+        selected_level = st.selectbox(
+            "Level Akun",
+            options=level_options
+        )
+        filters['level'] = int(selected_level.split()[-1])
+        
+        # 5. Filter kategori akun
+        kategori_options = {
+            'PENDAPATAN DAERAH-LO': '7',
+            'BEBAN DAERAH-LO': '8',
+            'PENDAPATAN DAERAH': '4',
+            'BELANJA DAERAH': '5',
+            'PEMBIAYAAN DAERAH': '6',
+            'ASET': '1',
+            'KEWAJIBAN': '2',
+            'EKUITAS': '3'
+        }
+        filters['kategori'] = st.selectbox(
+            "Kategori Akun",
+            options=list(kategori_options.keys())
+        )
+        filters['kode_kategori'] = kategori_options[filters['kategori']]
+        
+        # 6. Filter tipe transaksi
+        filters['tipe_transaksi'] = st.radio(
+            "Tipe Transaksi",
+            options=['All', 'Debet', 'Kredit'],
+            index=0
+        )
+    
+    return filters
+
+@lru_cache(maxsize=None)
+def filter_data(df, filters):
+    """Terapkan filter dengan optimasi query"""
+    try:
+        # 1. Filter dasar berdasarkan tanggal
+        mask = (df.index >= filters['start_date']) & (df.index <= filters['end_date'])
+        
+        # 2. Filter jenis transaksi
+        if filters['jns_transaksi']:
+            mask &= df['jns_transaksi'].isin(filters['jns_transaksi'])
+        
+        # 3. Filter unit
+        if filters['unit'] != 'All':
+            mask &= df['nm_unit'] == filters['unit']
+        
+        # 4. Filter level dan kategori akun
+        level_col = f'level_{filters["level"]}'
+        if level_col in df.columns:
+            mask &= df[level_col].str.startswith(filters['kode_kategori'])
+        
+        # 5. Filter tipe transaksi
+        if filters['tipe_transaksi'] == 'Debet':
+            mask &= df['debet'] > 0
+        elif filters['tipe_transaksi'] == 'Kredit':
+            mask &= df['kredit'] > 0
+        
+        return df[mask].copy()
+    
+    except Exception as e:
+        st.error(f"Error dalam filtering: {str(e)}")
+        return pd.DataFrame()
+
+def main_app():
+    st.title("📊 Aplikasi Filter Data Transaksi")
+    
+    # Muat data
+    with st.spinner('Memuat data...'):
+        df = load_and_preprocess()
+        if df.empty:
             return
-
-    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
-    if "level_options" not in st.session_state:
-        try:
-            # Baca file coa.xlsx hanya untuk mendapatkan daftar akun berdasarkan level
-            coa = pd.read_excel("data/coa.xlsx")
-            
-            # Pastikan kolom Level ada dan tidak kosong
-            if "Level" not in coa.columns or coa["Level"].isnull().all():
-                raise ValueError("Kolom 'Level' tidak ditemukan atau kosong.")
-            
-            # Kelompokkan akun berdasarkan level (gunakan kolom Level secara langsung)
-            level_options = {}
-            for level in range(1, 7):
-                level_str = f"Level {level}"
-                level_options[level_str] = list(
-                    coa[coa["Level"] == level]["Nama Akun"].unique()
-                )
-            
-            st.session_state["level_options"] = level_options
-        except Exception as e:
-            st.error(f"Gagal memuat daftar akun: {str(e)}")
-            return
-
-    # Widget filtering
-    st.subheader("Filter Data")
-
-    # 1. Filter berdasarkan bulan
-    st.write("Pilih Bulan:")
-    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
-
-    # 2. Filter berdasarkan jenis transaksi
-    st.write("Pilih Jenis Transaksi:")
-    jenis_transaksi_options = [
-        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
-        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
-        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
+    
+    # Buat filter
+    filters = create_filters(df)
+    
+    # Terapkan filter
+    with st.spinner('Memproses filter...'):
+        filtered_df = filter_data(df, tuple(filters.items()))
+    
+    # Tampilkan hasil
+    st.subheader(f"Hasil Filter ({len(filtered_df):,} transaksi)")
+    
+    # Tampilkan data
+    cols_to_show = [
+        'no_bukti', 'tgl_transaksi', 'jns_transaksi', 'nm_unit',
+        'kd_lv_6', 'Nama Akun', 'debet', 'kredit', 'uraian'
     ]
-    selected_jenis_transaksi = st.multiselect(
-        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
+    st.dataframe(
+        filtered_df[cols_to_show].head(1000),
+        height=600,
+        use_container_width=True
     )
-
-    # 3. Filter berdasarkan unit (SKPD atau All)
-    st.write("Pilih Unit:")
-    unit_options = ["All", "SKPD"]
-    selected_unit = st.radio("Unit", options=unit_options, index=0)
-
-    # Inisialisasi variabel untuk SKPD
-    selected_skpd = None
-
-    if selected_unit == "SKPD":
-        # Tampilkan selectbox untuk memilih SKPD
-        if "skpd_options" in st.session_state and st.session_state["skpd_options"]:
-            selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
-        else:
-            st.warning("Daftar SKPD tidak tersedia. Silakan periksa file data.")
-
-    # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
-    st.write("Pilih Kode Level:")
-    level_options = [f"Level {i}" for i in range(1, 7)]
-    selected_level = st.selectbox("Kode Level", options=level_options)
-
-    # Tambahkan filter berdasarkan kategori akun
-    st.write("Pilih Kategori Akun:")
-    kategori_akun = {
-        "PENDAPATAN DAERAH-LO": "7",
-        "BEBAN DAERAH-LO": "8",
-        "PENDAPATAN DAERAH": "4",
-        "BELANJA DAERAH": "5",
-        "PEMBIAYAAN DAERAH": "6",
-        "ASET": "1",
-        "KEWAJIBAN": "2",
-        "EKUITAS": "3"
-    }
-    selected_kategori = st.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
-
-    # Tampilkan selectbox untuk akun berdasarkan level dan kategori yang dipilih
-    if selected_level:
-        # Pastikan session state level_options memiliki data untuk level yang dipilih
-        if selected_level in st.session_state["level_options"]:
-            # Filter akun berdasarkan kategori (awalan kode akun)
-            coa = pd.read_excel("data/coa.xlsx")
-            target_kategori_awalan = kategori_akun[selected_kategori]
-            filtered_akun = coa[
-                (coa["Level"] == int(selected_level.split()[-1])) &  # Sesuaikan dengan level
-                (coa["Kode Akun"].astype(str).str.startswith(target_kategori_awalan))  # Sesuaikan dengan kategori
-            ]["Nama Akun"].unique()
-
-            if len(filtered_akun) > 0:  # Pastikan ada opsi akun
-                selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
-            else:
-                st.warning(f"Tidak ada akun tersedia untuk {selected_level} dan kategori {selected_kategori}.")
-        else:
-            st.warning(f"Tidak ada data akun untuk {selected_level}.")
-
-    # 5. Filter berdasarkan Debit/Kredit/All
-    st.write("Pilih Tipe Transaksi:")
-    transaction_type = st.radio(
-        "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
-    )
-
-    # Tombol untuk memproses data
-    if st.button("Proses Data"):
-        try:
-            # Baca file bukubesar.xlsb (data transaksi)
-            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-            # Baca file coa.xlsx (data COA untuk nama akun)
-            coa = pd.read_excel("data/coa.xlsx")
-            
-            # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
-            merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
-            
-            # Pastikan kolom tgl_transaksi adalah datetime
-            merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
-
-            # Terapkan filter berdasarkan pilihan pengguna
-            filtered_data = merged_data[
-                (merged_data["tgl_transaksi"].dt.month >= selected_month[0]) &
-                (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
-            ]
-
-            # Filter berdasarkan jenis transaksi
-            filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
-
-            # Filter berdasarkan unit (SKPD atau All)
-            if selected_unit == "SKPD":
-                # Ambil daftar SKPD unik dari data yang sudah difilter
-                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
-
-            # Filter berdasarkan Kode Level dan Akun
-            if selected_level and selected_akun:
-                target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
-                filtered_data = filtered_data[
-                    (filtered_data["Level"] == target_level) &  # Gunakan kolom Level secara langsung
-                    (filtered_data["Nama Akun"] == selected_akun)
-                ]
-
-            # Filter berdasarkan Debit/Kredit/All
-            if transaction_type == "Debet":
-                filtered_data = filtered_data[filtered_data["debet"] > 0]
-            elif transaction_type == "Kredit":
-                filtered_data = filtered_data[filtered_data["kredit"] > 0]
-
-            # Display hasil filter
-            st.subheader("Hasil Filter")
-            top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, max_value=100, value=20)
-            display_data = filtered_data.head(top_n) if len(filtered_data) > top_n else filtered_data
-
-            # Hanya tampilkan kolom penting untuk pengguna
-            columns_to_display = [
-                "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit", "kd_lv_6", 
-                "Nama Akun", "debet", "kredit", "uraian"
-            ]
-            display_data = display_data[columns_to_display]
-            st.dataframe(display_data)
-
-            # Download hasil filter sebagai Excel
-            st.subheader("Download Hasil Filter")
-            if st.button("Download Excel"):
-                output = BytesIO()
-                with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                    display_data.to_excel(writer, index=False, sheet_name="Filtered Data")
-                output.seek(0)
+    
+    # Opsi download
+    if not filtered_df.empty:
+        st.subheader("Ekspor Data")
+        
+        # Pilihan format
+        export_format = st.radio(
+            "Format File",
+            options=['Parquet (Cepat)', 'Excel (Lambat)'],
+            horizontal=True
+        )
+        
+        if st.button("Unduh Data"):
+            with st.spinner('Menyiapkan file...'):
+                if export_format == 'Parquet (Cepat)':
+                    output = BytesIO()
+                    filtered_df.to_parquet(output, index=False)
+                    ext = 'parquet'
+                else:
+                    output = BytesIO()
+                    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+                        filtered_df.to_excel(writer, index=False)
+                    ext = 'xlsx'
+                
                 st.download_button(
-                    label="Unduh File Excel",
-                    data=output,
-                    file_name="filtered_data.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                    label=f"Unduh {ext.upper()}",
+                    data=output.getvalue(),
+                    file_name=f"filtered_data.{ext}",
+                    mime="application/octet-stream"
                 )
 
-        except Exception as e:
-            st.error(f"Gagal memuat atau memproses data: {str(e)}")
-
-# Panggil fungsi app
-app()
+if __name__ == "__main__":
+    main_app()
