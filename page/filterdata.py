@@ -8,7 +8,6 @@ def app():
     # Baca file hanya sekali dan simpan di session state
     if "bukubesar" not in st.session_state:
         try:
-            # Membaca file bukubesar.xlsb
             st.session_state["bukubesar"] = pd.read_excel(
                 "data/bukubesar.xlsb",
                 engine="pyxlsb"
@@ -19,7 +18,6 @@ def app():
 
     if "coa" not in st.session_state:
         try:
-            # Membaca file coa.xlsx
             st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
         except Exception as e:
             st.error(f"Gagal memuat data coa: {str(e)}")
@@ -52,10 +50,6 @@ def app():
     except Exception as e:
         st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
         return
-
-    # Verifikasi hasil parsing tanggal
-    st.write("Contoh Tanggal Transaksi:")
-    st.write(bukubesar["tgl_transaksi"].head())
 
     # Inisialisasi session state untuk menyimpan daftar SKPD
     if "skpd_options" not in st.session_state:
@@ -208,12 +202,15 @@ def app():
                 how="left"
             )
             
+            # Hitung saldo akun
+            merged_data["Saldo"] = merged_data["debet"] - merged_data["kredit"]
+            
             # Tampilkan hasil
             st.subheader("Hasil Filter")
             top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
             display_data = merged_data.head(top_n)[[
                 "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit",
-                "kd_lv_6", "Nama Akun", "debet", "kredit", "uraian"
+                "kd_lv_6", "Nama Akun", "debet", "kredit", "Saldo", "uraian"
             ]]
             st.dataframe(display_data)
             
