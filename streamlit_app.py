@@ -3,7 +3,7 @@ from streamlit_option_menu import option_menu
 
 # Impor modul untuk halaman Filter Data
 try:
-    from filterdata import app as filter_data_app  # Mengimpor fungsi app dari filterdata.py
+    from pages.filterdata import app as filterdata_app  # Mengimpor fungsi app dari filterdata.py
 except ImportError as e:
     st.error(f"Error importing modules: {str(e)}")
     st.stop()
@@ -26,7 +26,7 @@ def main_page():
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
     # Panggil fungsi app dari filterdata.py
-    filter_data_app()
+    filterdata_app()
 
 # ----------- HALAMAN LRA -----------
 def lra_page():
