@@ -41,16 +41,15 @@ def app():
     selected_jenis_transaksi = st.multiselect(
         "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
     )
-
+    
     # 3. Filter berdasarkan unit (SKPD atau All)
     st.write("Pilih Unit:")
     unit_options = ["All", "SKPD"]
     selected_unit = st.radio("Unit", options=unit_options, index=0)
 
     if selected_unit == "SKPD":
-        # Placeholder untuk nama SKPD (akan diisi nanti setelah data dimuat)
-        skpd_options = []
-        selected_skpd = None
+         # Tampilkan selectbox untuk memilih SKPD
+        selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
 
     # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
     st.write("Pilih Kode Level:")
