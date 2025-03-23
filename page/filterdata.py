@@ -1,241 +1,123 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from io import BytesIO
 
-def app():
-    st.title("Filter Data Transaksi")
-
-    # Baca file hanya sekali dan simpan di session state
-    if "bukubesar" not in st.session_state:
-        try:
-            st.session_state["bukubesar"] = pd.read_excel(
-                "data/bukubesar.xlsb",
-                engine="pyxlsb"
-            )
-        except Exception as e:
-            st.error(f"Gagal memuat data bukubesar: {str(e)}")
-            return
-
-    if "coa" not in st.session_state:
-        try:
-            st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
-        except Exception as e:
-            st.error(f"Gagal memuat data coa: {str(e)}")
-            return
-
-    # Ambil DataFrame dari session state
-    bukubesar = st.session_state["bukubesar"]
-    coa = st.session_state["coa"]
-
-    # Perbaiki parsing kolom tgl_transaksi
+@st.cache_data
+def load_data():
+    """Muat dan cache data untuk optimasi"""
     try:
-        if "tgl_transaksi" in bukubesar.columns:
-            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
-            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"], 
-                    unit="D", 
-                    origin="1899-12-30"
-                )
-            else:
-                # Parsing tanggal dengan format dd/mm/yyyy
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"],
-                    format="%d/%m/%Y",
-                    errors="coerce"
-                )
-        else:
-            st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
-            return
-    except Exception as e:
-        st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
-        return
-
-    # Inisialisasi session state untuk menyimpan daftar SKPD
-    if "skpd_options" not in st.session_state:
-        try:
-            if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
-                raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
-            
-            skpd_options = list(bukubesar["nm_unit"].dropna().unique())
-            st.session_state["skpd_options"] = skpd_options
-        except Exception as e:
-            st.error(f"Gagal memuat daftar SKPD: {str(e)}")
-            return
-
-    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
-    if "level_options" not in st.session_state:
-        try:
-            if "Level" not in coa.columns or coa["Level"].isnull().all():
-                raise ValueError("Kolom 'Level' tidak ditemukan atau kosong.")
-            
-            level_options = {}
-            for level in range(1, 7):
-                level_str = f"Level {level}"
-                level_options[level_str] = list(
-                    coa[coa["Level"] == level]["Nama Akun"].unique()
-                )
-            
-            st.session_state["level_options"] = level_options
-        except Exception as e:
-            st.error(f"Gagal memuat daftar akun: {str(e)}")
-            return
-
-    # Widget filtering
-    st.subheader("Filter Data")
-    st.markdown("---")
-
-    # 1. Filter berdasarkan bulan
-    st.write("### Pilih Bulan:")
-    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
-    st.markdown("---")
-
-    # 2. Filter jenis transaksi
-    st.write("### Pilih Jenis Transaksi:")
-    jenis_transaksi_options = [
-        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
-        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
-        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
-    ]
-    selected_jenis_transaksi = st.multiselect(
-        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
-    )
-    st.markdown("---")
-
-    # 3. Filter unit (SKPD atau All)
-    st.write("### Pilih Unit:")
-    unit_options = ["All", "SKPD"]
-    selected_unit = st.radio("Unit", options=unit_options, index=0)
-    selected_skpd = None
-    if selected_unit == "SKPD":
-        if "skpd_options" in st.session_state and st.session_state["skpd_options"]:
-            selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
-        else:
-            st.warning("Daftar SKPD tidak tersedia.")
-    st.markdown("---")
-
-    # 4. Filter berdasarkan Kode Level dan Kategori Akun
-    st.write("### Pilih Kode Level:")
-    level_options = [f"Level {i}" for i in range(1, 7)]
-    selected_level = st.selectbox("Kode Level", options=level_options)
-    
-    st.write("### Pilih Kategori Akun:")
-    kategori_akun = {
-        "PENDAPATAN DAERAH-LO": "7",
-        "BEBAN DAERAH-LO": "8",
-        "PENDAPATAN DAERAH": "4",
-        "BELANJA DAERAH": "5",
-        "PEMBIAYAAN DAERAH": "6",
-        "ASET": "1",
-        "KEWAJIBAN": "2",
-        "EKUITAS": "3"
-    }
-    selected_kategori = st.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
-    
-    # Filter akun berdasarkan level dan kategori
-    selected_akun = None
-    if selected_level:
-        target_level = int(selected_level.split()[-1])
-        target_kategori = kategori_akun[selected_kategori]
-        filtered_akun = coa[
-            (coa["Level"] == target_level) & 
-            (coa["Kode Akun"].astype(str).str.startswith(target_kategori))
-        ]["Nama Akun"].unique()
+        # Baca dan preproses data
+        bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+        coa = pd.read_excel("data/coa.xlsx")
         
-        if len(filtered_akun) > 0:
-            selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
-        else:
-            st.warning("Tidak ada akun tersedia untuk level dan kategori ini.")
-    st.markdown("---")
+        # Konversi tipe data
+        bukubesar["kd_lv_6"] = bukubesar["kd_lv_6"].astype(str)
+        coa["Kode Akun"] = coa["Kode Akun"].astype(str)
+        
+        # Parsing tanggal dengan vectorized operation
+        bukubesar["tgl_transaksi"] = pd.to_datetime(
+            bukubesar["tgl_transaksi"], 
+            errors="coerce",
+            format="mixed"
+        )
+        
+        return bukubesar, coa
+    except Exception as e:
+        st.error(f"Error loading data: {str(e)}")
+        return None, None
 
-    # 5. Filter berdasarkan Debit/Kredit/All
-    st.write("### Pilih Tipe Transaksi:")
-    transaction_type = st.radio(
-        "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
+def hitung_saldo_cepat(_df, kode_col, saldo_col):
+    """Fungsi teroptimasi untuk menghitung saldo hierarki"""
+    # Split kode akun menjadi komponen
+    split_codes = _df[kode_col].str.split('.', expand=True)
+    
+    # Generate semua parent code
+    parent_codes = []
+    for level in range(1, 7):
+        level_codes = split_codes.iloc[:, :level].agg('.'.join, axis=1)
+        parent_codes.append(level_codes)
+    
+    # Gabungkan semua kode
+    all_codes = pd.concat(
+        [split_codes.iloc[:, :level] for level in range(1, 7)] + 
+        [_df[kode_col]],
+        ignore_index=True
     )
-    st.markdown("---")
+    
+    # Gabungkan dengan saldo
+    exploded = pd.concat([
+        pd.DataFrame({'Kode Rek': code, 'Saldo': _df[saldo_col]})
+        for code in parent_codes
+    ])
+    
+    # Group dan aggregasi
+    return exploded.groupby('Kode Rek', as_index=False)['Saldo'].sum()
 
-    # Tombol proses data
-    if st.button("Proses Data"):
-        try:
-            filtered_data = bukubesar.copy()
-            
-            # 1. Filter bulan
-            bulan_condition = (
-                (filtered_data["tgl_transaksi"].dt.month >= selected_month[0]) &
-                (filtered_data["tgl_transaksi"].dt.month <= selected_month[1])
-            )
-            filtered_data = filtered_data[bulan_condition]
-            
-            # 2. Filter jenis transaksi
-            filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
-            
-            # 3. Filter unit
-            if selected_unit == "SKPD" and selected_skpd:
-                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
-            
-            # 4. Filter akun berdasarkan hierarki kode
-            if selected_akun:
-                target_level = int(selected_level.split()[-1])
-                kode_akun = coa[
-                    (coa["Nama Akun"] == selected_akun) & 
-                    (coa["Level"] == target_level)
-                ]["Kode Akun"].iloc[0]
-                
-                # Filter kd_lv_6 yang termasuk dalam hierarki kode terpilih
-                filtered_data = filtered_data[
-                    filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
-                ]
-            
-            # 5. Filter tipe transaksi
-            if transaction_type == "Debet":
-                filtered_data = filtered_data[filtered_data["debet"] > 0]
-            elif transaction_type == "Kredit":
-                filtered_data = filtered_data[filtered_data["kredit"] > 0]
-            
-            # Gabungkan dengan COA untuk tampilkan nama akun
-            merged_data = pd.merge(
-                filtered_data,
-                coa[["Kode Akun", "Nama Akun"]],
-                left_on="kd_lv_6",
-                right_on="Kode Akun",
-                how="left"
-            )
-            
-            # Hitung saldo akun
-            saldo_akun = merged_data["debet"].sum() - merged_data["kredit"].sum()
-            
-            # Tampilkan saldo akun di atas tabel hasil filter
-            st.subheader("Saldo Akun")
-            st.write(f"Saldo ({selected_akun}): Rp {saldo_akun:,.0f}")
-            
-            # Generate nama file dinamis
-            unit_name = selected_skpd if selected_unit == "SKPD" else "All"
-            file_name = f"{unit_name}_{selected_level}_{selected_akun}.xlsx"
-            
-            # Tampilkan hasil filter
-            st.subheader("Hasil Filter")
-            top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
-            display_data = merged_data.head(top_n)[[
-                "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit",
-                "kd_lv_6", "Nama Akun", "debet", "kredit", "uraian"
-            ]]
-            st.dataframe(display_data)
-            
-            # Download hasil
-            output = BytesIO()
-            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-                merged_data.to_excel(writer, index=False)
-            output.seek(0)
-            st.download_button(
-                "Unduh Excel",
-                data=output,
-                file_name=file_name,
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            
-        except Exception as e:
-            st.error(f"Terjadi kesalahan: {str(e)}")
+def buat_laporan():
+    bukubesar, coa = load_data()
+    if bukubesar is None or coa is None:
+        return
+    
+    # Gabungkan data dengan merge cepat
+    merged = pd.merge(
+        bukubesar,
+        coa[["Kode Akun", "Nama Akun"]],
+        left_on="kd_lv_6",
+        right_on="Kode Akun",
+        how="left"
+    )
+    
+    # Hitung saldo dengan vectorized operation
+    merged["Saldo"] = merged["debet"] - merged["kredit"]
+    
+    # Filter dengan boolean indexing
+    mask_pendapatan = merged["Kode Akun"].str.startswith("4", na=False)
+    mask_belanja = merged["Kode Akun"].str.startswith("5", na=False)
+    mask_pembiayaan = merged["Kode Akun"].str.startswith("6", na=False)
+    
+    # Hitung saldo hierarki dengan fungsi cepat
+    saldo_pendapatan = hitung_saldo_cepat(merged[mask_pendapatan], "Kode Akun", "Saldo")
+    saldo_belanja = hitung_saldo_cepat(merged[mask_belanja], "Kode Akun", "Saldo")
+    saldo_pembiayaan = hitung_saldo_cepat(merged[mask_pembiayaan], "Kode Akun", "Saldo")
+    
+    # Gabungkan hasil
+    laporan = pd.concat([
+        saldo_pendapatan.assign(Uraian="Pendapatan " + saldo_pendapatan["Kode Rek"]),
+        saldo_belanja.assign(Uraian="Belanja " + saldo_belanja["Kode Rek"]),
+        saldo_pembiayaan.assign(Uraian="Pembiayaan " + saldo_pembiayaan["Kode Rek"])
+    ])
+    
+    # Hitung total dengan numpy untuk performa
+    totals = [
+        ("Jumlah Total Pendapatan", saldo_pendapatan["Saldo"].sum()),
+        ("Jumlah Total Belanja", saldo_belanja["Saldo"].sum()),
+        ("Surplus/Defisit", saldo_pendapatan["Saldo"].sum() - saldo_belanja["Saldo"].sum())
+    ]
+    
+    # Tambahkan total ke dataframe
+    total_df = pd.DataFrame([{
+        "Kode Rek": "",
+        "Uraian": label,
+        "Saldo": np.sum(value)
+    } for label, value in totals])
+    
+    laporan = pd.concat([laporan, total_df], ignore_index=True)
+    
+    # Format mata uang
+    laporan["Saldo"] = laporan["Saldo"].map(lambda x: f"Rp {x:,.0f}")
+    
+    # Tampilkan hasil
+    st.dataframe(laporan)
+    
+    # Download
+    output = BytesIO()
+    laporan.to_excel(output, index=False)
+    st.download_button("Unduh Laporan", output.getvalue(), file_name="LRA.xlsx")
 
-# Jalankan aplikasi
-app()
+def app():
+    st.title("Laporan Realisasi Anggaran (LRA) - Optimized")
+    buat_laporan()
+
+if __name__ == "__main__":
+    app()
