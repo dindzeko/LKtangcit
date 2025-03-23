@@ -29,6 +29,10 @@ def generate_lra():
         st.error(f"Kolom berikut harus ada di 'coa': {required_columns_coa}")
         return
     
+    # Normalisasi format kode akun
+    bukubesar["kd_lv_6"] = bukubesar["kd_lv_6"].str.strip()
+    coa["Kode Akun"] = coa["Kode Akun"].str.strip()
+    
     # Filter bukubesar untuk menghilangkan "Jurnal Penutup"
     if "jns_transaksi" in bukubesar.columns:
         bukubesar = bukubesar[bukubesar["jns_transaksi"] != "Jurnal Penutup"]
@@ -72,6 +76,7 @@ def generate_lra():
     for _, row in pendapatan_l1.iterrows():
         kode = row["Kode Akun"]
         saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
+        logging.debug(f"Pendapatan Level 1 - Kode: {kode}, Saldo: {saldo}")
         lra_data.append({
             "Kode Rek": kode,
             "Uraian": row["Nama Akun"],
@@ -83,6 +88,7 @@ def generate_lra():
                            (coa["Level"] == 2)]
         for _, l2 in pendapatan_l2.iterrows():
             saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
+            logging.debug(f"Pendapatan Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
             lra_data.append({
                 "Kode Rek": l2["Kode Akun"],
                 "Uraian": l2["Nama Akun"],
@@ -95,6 +101,7 @@ def generate_lra():
             for _, l3 in pendapatan_l3.iterrows():
                 transaksi = bukubesar[bukubesar["kd_lv_6"] == l3["Kode Akun"]]
                 saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
+                logging.debug(f"Pendapatan Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
                 lra_data.append({
                     "Kode Rek": l3["Kode Akun"],
                     "Uraian": l3["Nama Akun"],
@@ -103,6 +110,7 @@ def generate_lra():
 
     # Total Pendapatan
     total_pendapatan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4"))
+    logging.debug(f"Total Pendapatan: {total_pendapatan}")
     lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total pendapatan", "Saldo": total_pendapatan})
 
     # ======================= BELANJA =======================
@@ -113,6 +121,7 @@ def generate_lra():
     for _, row in belanja_l1.iterrows():
         kode = row["Kode Akun"]
         saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
+        logging.debug(f"Belanja Level 1 - Kode: {kode}, Saldo: {saldo}")
         lra_data.append({
             "Kode Rek": kode,
             "Uraian": row["Nama Akun"],
@@ -124,6 +133,7 @@ def generate_lra():
                         (coa["Level"] == 2)]
         for _, l2 in belanja_l2.iterrows():
             saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
+            logging.debug(f"Belanja Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
             lra_data.append({
                 "Kode Rek": l2["Kode Akun"],
                 "Uraian": l2["Nama Akun"],
@@ -136,6 +146,7 @@ def generate_lra():
             for _, l3 in belanja_l3.iterrows():
                 transaksi = bukubesar[bukubesar["kd_lv_6"] == l3["Kode Akun"]]
                 saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
+                logging.debug(f"Belanja Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
                 lra_data.append({
                     "Kode Rek": l3["Kode Akun"],
                     "Uraian": l3["Nama Akun"],
@@ -144,10 +155,12 @@ def generate_lra():
 
     # Total Belanja
     total_belanja = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5"))
+    logging.debug(f"Total Belanja: {total_belanja}")
     lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total belanja", "Saldo": total_belanja})
 
     # ======================= SURPLUS/DEFISIT =======================
     surplus_defisit = total_pendapatan - total_belanja
+    logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
 
     # ======================= PEMBIAYAAN =======================
@@ -158,6 +171,7 @@ def generate_lra():
     for _, row in pembiayaan_l1.iterrows():
         kode = row["Kode Akun"]
         saldo = calculate_hierarchy(kode, 1, coa, bukubesar)
+        logging.debug(f"Pembiayaan Level 1 - Kode: {kode}, Saldo: {saldo}")
         lra_data.append({
             "Kode Rek": kode,
             "Uraian": row["Nama Akun"],
@@ -169,6 +183,7 @@ def generate_lra():
                            (coa["Level"] == 2)]
         for _, l2 in pembiayaan_l2.iterrows():
             saldo_l2 = calculate_hierarchy(l2["Kode Akun"], 2, coa, bukubesar)
+            logging.debug(f"Pembiayaan Level 2 - Kode: {l2['Kode Akun']}, Saldo: {saldo_l2}")
             lra_data.append({
                 "Kode Rek": l2["Kode Akun"],
                 "Uraian": l2["Nama Akun"],
@@ -181,6 +196,7 @@ def generate_lra():
             for _, l3 in pembiayaan_l3.iterrows():
                 transaksi = bukubesar[bukubesar["kd_lv_6"] == l3["Kode Akun"]]
                 saldo_l3 = transaksi["debet"].sum() - transaksi["kredit"].sum()
+                logging.debug(f"Pembiayaan Level 3 - Kode: {l3['Kode Akun']}, Saldo: {saldo_l3}")
                 lra_data.append({
                     "Kode Rek": l3["Kode Akun"],
                     "Uraian": l3["Nama Akun"],
@@ -191,10 +207,12 @@ def generate_lra():
     total_pembiayaan_penerimaan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.1"))
     total_pembiayaan_pengeluaran = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.2"))
     pembiayaan_netto = total_pembiayaan_penerimaan - total_pembiayaan_pengeluaran
+    logging.debug(f"Pembiayaan Netto: {pembiayaan_netto}")
     lra_data.append({"Kode Rek": "", "Uraian": "Pembiayaan Netto", "Saldo": pembiayaan_netto})
 
     # ======================= SILPA/SIKPA =======================
     silpa = surplus_defisit + pembiayaan_netto
+    logging.debug(f"SILPA/SIKPA: {silpa}")
     lra_data.append({"Kode Rek": "", "Uraian": "SILPA/SIKPA", "Saldo": silpa})
 
     # Membuat DataFrame hasil
