@@ -1,102 +1,78 @@
 import streamlit as st
-from streamlit_option_menu import option_menu
+import pandas as pd
+from io import BytesIO
 
-# Impor modul untuk halaman Filter Data
-try:
-    from filterdata import app as filterdata_app  # Mengimpor fungsi app dari filterdata.py
-except ImportError as e:
-    st.error(f"Error importing modules: {str(e)}")
-    st.stop()
+def app():
+    st.title("Halaman Filter Data")
 
-# ----------- HALAMAN UTAMA -----------
-def main_page():
-    st.title("Selamat Datang!")
-    st.write("""
-    Aplikasi ini dirancang untuk membantu Anda mengelola laporan keuangan.
-    Pilih halaman dari menu sidebar untuk melihat laporan tertentu.
-    
-    Halaman yang tersedia:
-    - **Filter Data**: Memfilter data transaksi.
-    - **LRA**: Laporan Realisasi Anggaran.
-    - **Neraca**: Laporan Neraca.
-    - **LO**: Laporan Operasional.
-    - **Prosedur Analitis**: Melakukan analisis prosedural.
-    """)
+    # Load data
+    try:
+        # Baca file bukubesar.xlsb
+        bukubesar = pd.read_excel("bukubesar.xlsb", engine="pyxlsb")
+        # Baca file coa.xlsx
+        coa = pd.read_excel("coa.xlsx")
+        
+        # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
+        merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
+    except Exception as e:
+        st.error(f"Gagal memuat data: {str(e)}")
+        return
 
-# ----------- HALAMAN FILTER DATA -----------
-def filter_data_page():
-    # Panggil fungsi app dari filterdata.py
-    filterdata_app()
+    # Widget filtering
+    st.subheader("Filtering Data")
 
-# ----------- HALAMAN LRA -----------
-def lra_page():
-    st.title("Halaman LRA")
-    st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
-    tahun = st.selectbox("Pilih Tahun:", ["2021", "2022", "2023"])
-    st.write(f"Menampilkan data LRA untuk tahun {tahun}.")
-    # Contoh: Tampilkan grafik atau tabel LRA (akan ditambahkan nanti)
+    # 1. Filter berdasarkan bulan
+    st.write("Pilih Bulan:")
+    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
+    filtered_data = merged_data[
+        (merged_data["tgl_transaksi"].dt.month >= selected_month[0]) &
+        (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
+    ]
 
-# ----------- HALAMAN NERACA -----------
-def neraca_page():
-    st.title("Halaman Neraca")
-    st.write("Ini adalah halaman untuk Laporan Neraca.")
-    periode = st.radio("Pilih Periode:", ["Bulan", "Tahun"])
-    st.write(f"Menampilkan data neraca untuk periode {periode}.")
-    # Contoh: Tampilkan neraca dalam bentuk tabel atau grafik (akan ditambahkan nanti)
+    # 2. Filter berdasarkan jns_transaksi (multiselect)
+    st.write("Pilih Jenis Transaksi:")
+    jenis_transaksi_options = list(filtered_data["jns_transaksi"].unique())
+    selected_jenis_transaksi = st.multiselect("Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options)
+    filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
 
-# ----------- HALAMAN LO -----------
-def lo_page():
-    st.title("Halaman LO")
-    st.write("Ini adalah halaman untuk Laporan Operasional (LO).")
-    jenis_laporan = st.multiselect("Pilih Jenis Laporan:", ["Pendapatan", "Beban", "Laba Rugi"])
-    st.write(f"Menampilkan data LO untuk kategori: {', '.join(jenis_laporan)}.")
-    # Contoh: Tampilkan laporan operasional (akan ditambahkan nanti)
+    # 3. Filter berdasarkan nm_unit (segmented control)
+    st.write("Pilih Unit:")
+    unit_options = ["All"] + list(filtered_data["nm_unit"].unique())
+    selected_unit = st.radio("Unit", options=unit_options, index=0)
+    if selected_unit != "All":
+        filtered_data = filtered_data[filtered_data["nm_unit"] == selected_unit]
 
-# ----------- HALAMAN PROSEDUR ANALITIS -----------
-def prosedur_analitis_page():
-    st.title("Halaman Prosedur Analitis")
-    st.write("Ini adalah halaman untuk melakukan analisis prosedural.")
-    metode_analisis = st.selectbox("Pilih Metode Analisis:", ["Analisis Varians", "Analisis Trend", "Analisis Rasio"])
-    st.write(f"Melakukan {metode_analisis}...")
-    # Contoh: Tambahkan logika analisis (akan ditambahkan nanti)
+    # 4. Filter berdasarkan Kode Level (select box)
+    st.write("Pilih Kode Level:")
+    level_options = [f"Level {i}" for i in range(1, 7)]
+    selected_level = st.selectbox("Kode Level", options=level_options)
+    level_column = f"Level {selected_level.split()[-1]}"  # Ambil angka dari string "Level X"
+    filtered_data = filtered_data.dropna(subset=[level_column])
 
-# ----------- KONFIGURASI NAVIGASI -----------
-page_config = {
-    "Main Page": main_page,
-    "Filter Data": filter_data_page,
-    "LRA": lra_page,
-    "Neraca": neraca_page,
-    "LO": lo_page,
-    "Prosedur Analitis": prosedur_analitis_page,
-}
+    # 5. Filter berdasarkan Debit/Kredit/All (pills)
+    st.write("Pilih Tipe Transaksi:")
+    transaction_type = st.radio("Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True)
+    if transaction_type == "Debet":
+        filtered_data = filtered_data[filtered_data["debet"] > 0]
+    elif transaction_type == "Kredit":
+        filtered_data = filtered_data[filtered_data["kredit"] > 0]
 
-# ----------- SIDEBAR -----------
-with st.sidebar:
-    selected = option_menu(
-        menu_title="Menu Navigasi",  # Judul menu
-        options=["Main Page", "Filter Data", "LRA", "Neraca", "LO", "Prosedur Analitis"],  # Opsi menu
-        icons=["house", "funnel", "bar-chart", "clipboard-data", "file-earmark-text", "gear"],  # Ikon untuk setiap opsi
-        menu_icon="cast",  # Ikon utama untuk menu
-        default_index=0,  # Halaman default saat aplikasi dimuat
-        styles={
-            "container": {"padding": "5px"},
-            "icon": {"color": "orange", "font-size": "20px"}, 
-            "nav-link": {
-                "font-size": "16px",
-                "text-align": "left",
-                "margin": "10px",
-                "--hover-color": "#0078d4",  # Warna hover
-            },
-            "nav-link-selected": {
-                "background-color": "#ff4b33",  # Warna tombol aktif
-                "color": "white",
-            },
-        },
-    )
+    # Display hasil filter
+    st.subheader("Hasil Filter")
+    top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, max_value=100, value=20)
+    display_data = filtered_data.head(top_n) if len(filtered_data) > top_n else filtered_data
+    st.dataframe(display_data)
 
-# ----------- RENDER HALAMAN -----------
-if selected in page_config:
-    # Panggil fungsi halaman yang sesuai berdasarkan pilihan sidebar
-    page_config[selected]()
-else:
-    st.error("Halaman tidak ditemukan")
+    # Download hasil filter sebagai Excel
+    st.subheader("Download Hasil Filter")
+    if st.button("Download Excel"):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+            display_data.to_excel(writer, index=False, sheet_name="Filtered Data")
+        output.seek(0)
+        st.download_button(
+            label="Unduh File Excel",
+            data=output,
+            file_name="filtered_data.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
