@@ -23,6 +23,7 @@ def filter_data_page():
 # ----------- HALAMAN LRA -----------
 def lra_page():
     st.title("Halaman LRA")
+    st.markdown("<br>", unsafe_allow_html=True)  # Tambahkan spasi vertikal
     st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
 
 # ----------- HALAMAN NERACA -----------
@@ -52,6 +53,20 @@ with st.sidebar:
         icons=["house", "funnel", "bar-chart", "clipboard-data", "file-earmark-text"],  # Ikon untuk setiap opsi
         menu_icon="cast",  # Ikon utama untuk menu
         default_index=0,  # Halaman default saat aplikasi dimuat
+        styles={
+            "container": {"padding": "5px"},
+            "icon": {"color": "orange", "font-size": "20px"}, 
+            "nav-link": {
+                "font-size": "16px",
+                "text-align": "left",
+                "margin": "10px",
+                "--hover-color": "#0078d4",  # Warna hover
+            },
+            "nav-link-selected": {
+                "background-color": "#ff4b33",  # Warna tombol aktif
+                "color": "white",
+            },
+        },
     )
 
 # ----------- RENDER HALAMAN -----------
