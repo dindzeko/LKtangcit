@@ -16,15 +16,18 @@ def app():
         bukubesar.columns = bukubesar.columns.str.replace(r"\s+", " ", regex=True).str.strip()
         coa.columns = coa.columns.str.replace(r"\s+", " ", regex=True).str.strip()
 
-        # Debugging: Cek nama kolom sebelum merge
-        st.write("Nama kolom di bukubesar:", bukubesar.columns.tolist())
-        st.write("Nama kolom di coa:", coa.columns.tolist())
-
         # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
         merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
-        st.write("Nama kolom setelah merge:", merged_data.columns.tolist())
     except Exception as e:
         st.error(f"Gagal memuat data: {str(e)}")
+        return
+
+    # Cek kolom penting
+    required_columns = ["Level", "debet", "kredit", "jns_transaksi", "nm_unit"]
+    missing_columns = [col for col in required_columns if col not in merged_data.columns]
+    if missing_columns:
+        st.error(f"Kolom berikut tidak ditemukan dalam dataset: {', '.join(missing_columns)}. "
+                 "Pastikan file Excel memiliki kolom tersebut.")
         return
 
     # Pastikan kolom tgl_transaksi adalah datetime
@@ -32,14 +35,6 @@ def app():
         merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
     except Exception as e:
         st.error(f"Gagal mengonversi kolom tgl_transaksi ke datetime: {str(e)}")
-        return
-
-    # Cek kolom penting
-    required_columns = ["Level", "debet", "kredit"]
-    missing_columns = [col for col in required_columns if col not in merged_data.columns]
-    if missing_columns:
-        st.error(f"Kolom berikut tidak ditemukan dalam dataset: {', '.join(missing_columns)}. "
-                 "Pastikan file Excel memiliki kolom tersebut.")
         return
 
     # Widget filtering
@@ -53,18 +48,28 @@ def app():
         (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
     ]
 
-    # 2. Filter berdasarkan jns_transaksi (multiselect)
+    # 2. Filter berdasarkan jenis transaksi
     st.write("Pilih Jenis Transaksi:")
-    jenis_transaksi_options = list(filtered_data["jns_transaksi"].unique())
-    selected_jenis_transaksi = st.multiselect("Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options)
+    jenis_transaksi_options = [
+        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
+        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
+        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
+    ]
+    selected_jenis_transaksi = st.multiselect(
+        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
+    )
     filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
 
-    # 3. Filter berdasarkan nm_unit (segmented control)
+    # 3. Filter berdasarkan unit (SKPD atau All)
     st.write("Pilih Unit:")
-    unit_options = ["All"] + list(filtered_data["nm_unit"].unique())
+    unit_options = ["All", "SKPD"]
     selected_unit = st.radio("Unit", options=unit_options, index=0)
-    if selected_unit != "All":
-        filtered_data = filtered_data[filtered_data["nm_unit"] == selected_unit]
+
+    if selected_unit == "SKPD":
+        # Tampilkan filter untuk memilih SKPD
+        skpd_options = list(filtered_data["nm_unit"].unique())
+        selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
+        filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
     # 4. Filter berdasarkan Kode Level (select box)
     st.write("Pilih Kode Level:")
@@ -77,18 +82,14 @@ def app():
         filtered_data["Level"].apply(lambda x: str(x).count(".") == target_level - 1)
     ]
 
-    # 5. Filter berdasarkan Debit/Kredit/All (pills)
+    # 5. Filter berdasarkan Debit/Kredit/All (tags)
     st.write("Pilih Tipe Transaksi:")
-    transaction_type = st.radio("Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True)
+    transaction_type = st.radio(
+        "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
+    )
     if transaction_type == "Debet":
-        if "debet" not in filtered_data.columns:
-            st.error("Kolom 'debet' tidak ditemukan dalam dataset.")
-            return
         filtered_data = filtered_data[filtered_data["debet"] > 0]
     elif transaction_type == "Kredit":
-        if "kredit" not in filtered_data.columns:
-            st.error("Kolom 'kredit' tidak ditemukan dalam dataset.")
-            return
         filtered_data = filtered_data[filtered_data["kredit"] > 0]
 
     # Display hasil filter
