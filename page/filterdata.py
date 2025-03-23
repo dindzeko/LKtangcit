@@ -167,7 +167,7 @@ def filter_data(df, filters):
         st.error(f"Error dalam filtering: {str(e)}")
         return pd.DataFrame()
 
-def main_app():
+def app():
     st.title("📊 Aplikasi Filter Data Transaksi")
     
     # Muat data
@@ -227,5 +227,6 @@ def main_app():
                     mime="application/octet-stream"
                 )
 
+# Jalankan aplikasi
 if __name__ == "__main__":
-    main_app()
+    app()
