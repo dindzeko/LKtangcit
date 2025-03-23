@@ -195,3 +195,5 @@ def app():
 
 # Panggil fungsi app
 app()
+untuk filtering aplikasi berjalan works. tapi apakah ada yang harus kita perbaiki agar aplikasi dapat cepat mengkalkulasi 
+untuk diketahui data bukubesar memang agak besr filenya 20an mb . dengan tranaksis mencapi 500an rb row .
