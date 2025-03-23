@@ -128,11 +128,6 @@ def generate_lra():
                     "Saldo": saldo_l3
                 })
     
-    # Total Pendapatan
-    total_pendapatan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4"))
-    logging.debug(f"Total Pendapatan: {total_pendapatan}")
-    lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total pendapatan", "Saldo": total_pendapatan})
-    
     # ======================= BELANJA =======================
     belanja_l1 = coa[(coa["Kode Akun"].str.startswith("5")) & 
                     (coa["Level"] == 1)]
@@ -171,13 +166,9 @@ def generate_lra():
                     "Saldo": saldo_l3
                 })
     
-    # Total Belanja
-    total_belanja = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5"))
-    logging.debug(f"Total Belanja: {total_belanja}")
-    lra_data.append({"Kode Rek": "", "Uraian": "Jumlah total belanja", "Saldo": total_belanja})
-    
     # ======================= SURPLUS/DEFISIT =======================
-    surplus_defisit = total_pendapatan - total_belanja
+    surplus_defisit = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4")) - \
+                      sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5"))
     logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
     
@@ -219,15 +210,8 @@ def generate_lra():
                     "Saldo": saldo_l3
                 })
     
-    # Total Pembiayaan
-    total_pembiayaan_penerimaan = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.1"))
-    total_pembiayaan_pengeluaran = sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6.2"))
-    pembiayaan_netto = total_pembiayaan_penerimaan - total_pembiayaan_pengeluaran
-    logging.debug(f"Pembiayaan Netto: {pembiayaan_netto}")
-    lra_data.append({"Kode Rek": "", "Uraian": "Pembiayaan Netto", "Saldo": pembiayaan_netto})
-    
     # ======================= SILPA/SIKPA =======================
-    silpa = surplus_defisit + pembiayaan_netto
+    silpa = surplus_defisit + sum(item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6"))
     logging.debug(f"SILPA/SIKPA: {silpa}")
     lra_data.append({"Kode Rek": "", "Uraian": "SILPA/SIKPA", "Saldo": silpa})
     
