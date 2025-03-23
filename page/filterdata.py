@@ -69,7 +69,10 @@ def app():
 
             # Filter berdasarkan unit (SKPD atau All)
             if selected_unit == "SKPD":
+                # Ambil daftar SKPD unik dari data yang sudah difilter
                 skpd_options = list(filtered_data["nm_unit"].unique())
+                
+                # Tampilkan selectbox untuk memilih SKPD
                 selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
