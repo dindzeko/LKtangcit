@@ -1,6 +1,10 @@
 import pandas as pd
 import streamlit as st
 from io import BytesIO
+import logging
+
+# Konfigurasi logging
+logging.basicConfig(level=logging.DEBUG)
 
 def generate_lra():
     st.title("Laporan Realisasi Anggaran (LRA)")
@@ -14,8 +18,27 @@ def generate_lra():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
     
+    # Validasi kolom penting
+    required_columns_bukubesar = ["kd_lv_6", "debet", "kredit", "jns_transaksi"]
+    if not all(col in bukubesar.columns for col in required_columns_bukubesar):
+        st.error(f"Kolom berikut harus ada di 'bukubesar': {required_columns_bukubesar}")
+        return
+    
+    required_columns_coa = ["Kode Akun", "Nama Akun", "Level"]
+    if not all(col in coa.columns for col in required_columns_coa):
+        st.error(f"Kolom berikut harus ada di 'coa': {required_columns_coa}")
+        return
+    
     # Filter bukubesar untuk menghilangkan "Jurnal Penutup"
-    bukubesar = bukubesar[bukubesar["jns_transaksi"] != "Jurnal Penutup"]
+    if "jns_transaksi" in bukubesar.columns:
+        bukubesar = bukubesar[bukubesar["jns_transaksi"] != "Jurnal Penutup"]
+    else:
+        st.error("Kolom 'jns_transaksi' tidak ditemukan di DataFrame 'bukubesar'.")
+        return
+    
+    # Konversi kolom 'debet' dan 'kredit' ke numerik
+    bukubesar["debet"] = pd.to_numeric(bukubesar["debet"], errors="coerce").fillna(0)
+    bukubesar["kredit"] = pd.to_numeric(bukubesar["kredit"], errors="coerce").fillna(0)
     
     # Fungsi untuk format mata uang
     def format_currency(value):
@@ -32,6 +55,7 @@ def generate_lra():
             if child["Level"] == 3:  # Level terendah (detail transaksi)
                 transaksi = df_transaksi[df_transaksi["kd_lv_6"] == child_code]
                 saldo = transaksi["debet"].sum() - transaksi["kredit"].sum()
+                logging.debug(f"Saldo untuk akun {child_code}: {saldo}")
             else:  # Rekursif untuk level di atasnya
                 saldo = calculate_hierarchy(child_code, child["Level"], df_coa, df_transaksi)
             total += saldo
