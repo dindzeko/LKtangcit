@@ -1,20 +1,6 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
-# Impor modul-modul
-try:
-    from modules.filter_data import app as filter_data_app
-    from modules.lra import app as lra_app
-    from modules.neraca import app as neraca_app
-    from modules.lo import app as lo_app
-except ImportError as e:
-    st.error(f"Error importing modules: {str(e)}")
-    st.stop()
-
-# Inisialisasi session state
-if "current_page" not in st.session_state:
-    st.session_state["current_page"] = "Main Page"
-
 # ----------- HALAMAN UTAMA -----------
 def main_page():
     st.title("Selamat Datang!")
@@ -29,31 +15,48 @@ def main_page():
     - **LO**: Laporan Operasional.
     """)
 
+# ----------- HALAMAN FILTER DATA -----------
+def filter_data_page():
+    st.title("Halaman Filter Data")
+    st.write("Ini adalah halaman untuk memfilter data transaksi.")
+
+# ----------- HALAMAN LRA -----------
+def lra_page():
+    st.title("Halaman LRA")
+    st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
+
+# ----------- HALAMAN NERACA -----------
+def neraca_page():
+    st.title("Halaman Neraca")
+    st.write("Ini adalah halaman untuk Laporan Neraca.")
+
+# ----------- HALAMAN LO -----------
+def lo_page():
+    st.title("Halaman LO")
+    st.write("Ini adalah halaman untuk Laporan Operasional (LO).")
+
 # ----------- KONFIGURASI NAVIGASI -----------
 page_config = {
     "Main Page": main_page,
-    "Filter Data": filter_data_app,
-    "LRA": lra_app,
-    "Neraca": neraca_app,
-    "LO": lo_app,
+    "Filter Data": filter_data_page,
+    "LRA": lra_page,
+    "Neraca": neraca_page,
+    "LO": lo_page,
 }
 
 # ----------- SIDEBAR -----------
 with st.sidebar:
     selected = option_menu(
-        menu_title="Menu",
-        options=list(page_config.keys()),
-        icons=["house", "funnel", "bar-chart", "clipboard-data", "file-earmark-text"],
-        menu_icon="cast",
-        default_index=0,
+        menu_title="Menu Navigasi",  # Judul menu
+        options=["Main Page", "Filter Data", "LRA", "Neraca", "LO"],  # Opsi menu
+        icons=["house", "funnel", "bar-chart", "clipboard-data", "file-earmark-text"],  # Ikon untuk setiap opsi
+        menu_icon="cast",  # Ikon utama untuk menu
+        default_index=0,  # Halaman default saat aplikasi dimuat
     )
 
 # ----------- RENDER HALAMAN -----------
 if selected in page_config:
-    if selected == "Main Page":
-        page_config[selected]()  # Panggil fungsi langsung untuk halaman utama
-    else:
-        st.session_state["current_page"] = selected
-        page_config[selected]()  # Panggil fungsi untuk halaman lainnya
+    # Panggil fungsi halaman yang sesuai berdasarkan pilihan sidebar
+    page_config[selected]()
 else:
     st.error("Halaman tidak ditemukan")
