@@ -155,8 +155,13 @@ def generate_lra():
                 })
     
     # ======================= SURPLUS/DEFISIT =======================
-    total_pendapatan = next((item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4")), 0)
-    total_belanja = next((item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5")), 0)
+    # Ambil saldo total pendapatan dan belanja dari level 1
+    total_pendapatan_item = next((item for item in lra_data if item["Kode Rek"] == "4"), None)
+    total_pendapatan = total_pendapatan_item["Saldo"] if total_pendapatan_item else 0
+    
+    total_belanja_item = next((item for item in lra_data if item["Kode Rek"] == "5"), None)
+    total_belanja = total_belanja_item["Saldo"] if total_belanja_item else 0
+    
     surplus_defisit = total_pendapatan - total_belanja
     logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
@@ -196,7 +201,10 @@ def generate_lra():
                 })
     
     # ======================= SILPA/SIKPA =======================
-    total_pembiayaan = next((item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("6")), 0)
+    # Ambil saldo total pembiayaan dari level 1
+    total_pembiayaan_item = next((item for item in lra_data if item["Kode Rek"] == "6"), None)
+    total_pembiayaan = total_pembiayaan_item["Saldo"] if total_pembiayaan_item else 0
+    
     silpa = surplus_defisit - total_pembiayaan
     logging.debug(f"SILPA/SIKPA: {silpa}")
     lra_data.append({"Kode Rek": "", "Uraian": "SILPA/SIKPA", "Saldo": silpa})
