@@ -205,7 +205,7 @@ def generate_lra():
     total_pembiayaan_item = next((item for item in lra_data if item["Kode Rek"] == "6"), None)
     total_pembiayaan = total_pembiayaan_item["Saldo"] if total_pembiayaan_item else 0
     
-    silpa = surplus_defisit - total_pembiayaan
+    silpa = surplus_defisit + total_pembiayaan
     logging.debug(f"SILPA/SIKPA: {silpa}")
     lra_data.append({"Kode Rek": "", "Uraian": "SILPA/SIKPA", "Saldo": silpa})
     
