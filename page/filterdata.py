@@ -5,12 +5,27 @@ from io import BytesIO
 def app():
     st.title("Filter Data Transaksi")
 
+    # Baca file hanya sekali dan simpan di session state
+    if "bukubesar" not in st.session_state:
+        try:
+            st.session_state["bukubesar"] = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+        except Exception as e:
+            st.error(f"Gagal memuat data bukubesar: {str(e)}")
+            return
+
+    if "coa" not in st.session_state:
+        try:
+            st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
+        except Exception as e:
+            st.error(f"Gagal memuat data coa: {str(e)}")
+            return
+
+    bukubesar = st.session_state["bukubesar"]
+    coa = st.session_state["coa"]
+
     # Inisialisasi session state untuk menyimpan daftar SKPD
     if "skpd_options" not in st.session_state:
         try:
-            # Baca file bukubesar.xlsb hanya untuk mendapatkan daftar SKPD
-            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-            
             # Pastikan kolom nm_unit ada dan tidak kosong
             if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
                 raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
@@ -24,9 +39,6 @@ def app():
     # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
     if "level_options" not in st.session_state:
         try:
-            # Baca file coa.xlsx hanya untuk mendapatkan daftar akun berdasarkan level
-            coa = pd.read_excel("data/coa.xlsx")
-            
             # Pastikan kolom Level ada dan tidak kosong
             if "Level" not in coa.columns or coa["Level"].isnull().all():
                 raise ValueError("Kolom 'Level' tidak ditemukan atau kosong.")
@@ -46,13 +58,16 @@ def app():
 
     # Widget filtering
     st.subheader("Filter Data")
+    st.markdown("---")
 
     # 1. Filter berdasarkan bulan
-    st.write("Pilih Bulan:")
+    st.write("### Pilih Bulan:")
     selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
 
+    st.markdown("---")
+
     # 2. Filter berdasarkan jenis transaksi
-    st.write("Pilih Jenis Transaksi:")
+    st.write("### Pilih Jenis Transaksi:")
     jenis_transaksi_options = [
         "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
         "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
@@ -62,28 +77,32 @@ def app():
         "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
     )
 
+    st.markdown("---")
+
     # 3. Filter berdasarkan unit (SKPD atau All)
-    st.write("Pilih Unit:")
+    st.write("### Pilih Unit:")
     unit_options = ["All", "SKPD"]
     selected_unit = st.radio("Unit", options=unit_options, index=0)
 
     # Inisialisasi variabel untuk SKPD
     selected_skpd = None
-
     if selected_unit == "SKPD":
-        # Tampilkan selectbox untuk memilih SKPD
         if "skpd_options" in st.session_state and st.session_state["skpd_options"]:
             selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
         else:
             st.warning("Daftar SKPD tidak tersedia. Silakan periksa file data.")
 
+    st.markdown("---")
+
     # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
-    st.write("Pilih Kode Level:")
+    st.write("### Pilih Kode Level:")
     level_options = [f"Level {i}" for i in range(1, 7)]
     selected_level = st.selectbox("Kode Level", options=level_options)
 
+    st.markdown("---")
+
     # Tambahkan filter berdasarkan kategori akun
-    st.write("Pilih Kategori Akun:")
+    st.write("### Pilih Kategori Akun:")
     kategori_akun = {
         "PENDAPATAN DAERAH-LO": "7",
         "BEBAN DAERAH-LO": "8",
@@ -98,10 +117,8 @@ def app():
 
     # Tampilkan selectbox untuk akun berdasarkan level dan kategori yang dipilih
     if selected_level:
-        # Pastikan session state level_options memiliki data untuk level yang dipilih
         if selected_level in st.session_state["level_options"]:
             # Filter akun berdasarkan kategori (awalan kode akun)
-            coa = pd.read_excel("data/coa.xlsx")
             target_kategori_awalan = kategori_akun[selected_kategori]
             filtered_akun = coa[
                 (coa["Level"] == int(selected_level.split()[-1])) &  # Sesuaikan dengan level
@@ -115,8 +132,10 @@ def app():
         else:
             st.warning(f"Tidak ada data akun untuk {selected_level}.")
 
+    st.markdown("---")
+
     # 5. Filter berdasarkan Debit/Kredit/All
-    st.write("Pilih Tipe Transaksi:")
+    st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
     )
@@ -124,44 +143,62 @@ def app():
     # Tombol untuk memproses data
     if st.button("Proses Data"):
         try:
-            # Baca file bukubesar.xlsb (data transaksi)
-            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
-            # Baca file coa.xlsx (data COA untuk nama akun)
-            coa = pd.read_excel("data/coa.xlsx")
-            
             # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
             merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
             
             # Pastikan kolom tgl_transaksi adalah datetime
             merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
 
-            # Terapkan filter berdasarkan pilihan pengguna
-            filtered_data = merged_data[
+            # Validasi input
+            if not selected_month:
+                st.warning("Pilih rentang bulan terlebih dahulu.")
+                return
+
+            if not selected_jenis_transaksi:
+                st.warning("Pilih setidaknya satu jenis transaksi.")
+                return
+
+            if selected_unit == "SKPD" and not selected_skpd:
+                st.warning("Pilih SKPD terlebih dahulu.")
+                return
+
+            # Inisialisasi list untuk kondisi filtering
+            conditions = []
+
+            # 1. Filter berdasarkan bulan
+            conditions.append(
                 (merged_data["tgl_transaksi"].dt.month >= selected_month[0]) &
                 (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
-            ]
+            )
 
-            # Filter berdasarkan jenis transaksi
-            filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+            # 2. Filter berdasarkan jenis transaksi
+            conditions.append(merged_data["jns_transaksi"].isin(selected_jenis_transaksi))
 
-            # Filter berdasarkan unit (SKPD atau All)
-            if selected_unit == "SKPD":
-                # Ambil daftar SKPD unik dari data yang sudah difilter
-                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
+            # 3. Filter berdasarkan unit (SKPD atau All)
+            if selected_unit == "SKPD" and selected_skpd:
+                conditions.append(merged_data["nm_unit"] == selected_skpd)
 
-            # Filter berdasarkan Kode Level dan Akun
+            # 4. Filter berdasarkan Kode Level dan Akun
             if selected_level and selected_akun:
                 target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
-                filtered_data = filtered_data[
-                    (filtered_data["Level"] == target_level) &  # Gunakan kolom Level secara langsung
-                    (filtered_data["Nama Akun"] == selected_akun)
-                ]
+                conditions.append(
+                    (merged_data["Level"] == target_level) & 
+                    (merged_data["Nama Akun"] == selected_akun)
+                )
 
-            # Filter berdasarkan Debit/Kredit/All
+            # 5. Filter berdasarkan Debit/Kredit/All
             if transaction_type == "Debet":
-                filtered_data = filtered_data[filtered_data["debet"] > 0]
+                conditions.append(merged_data["debet"] > 0)
             elif transaction_type == "Kredit":
-                filtered_data = filtered_data[filtered_data["kredit"] > 0]
+                conditions.append(merged_data["kredit"] > 0)
+
+            # Gabungkan semua kondisi dengan operator AND
+            if conditions:
+                filtered_data = merged_data[pd.Series(True, index=merged_data.index)]  # Start with all rows
+                for condition in conditions:
+                    filtered_data = filtered_data[condition]
+            else:
+                filtered_data = merged_data  # Jika tidak ada kondisi, tampilkan semua data
 
             # Display hasil filter
             st.subheader("Hasil Filter")
