@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 from io import BytesIO
 
-# Gunakan fungsi load_data dari utils.py
+# Impor fungsi load_data dari utils.py
 from utils import load_data
 
 def hitung_saldo_cepat(_df, kode_col, saldo_col):
@@ -27,6 +27,7 @@ def hitung_saldo_cepat(_df, kode_col, saldo_col):
     return exploded.groupby('Kode Rek', as_index=False)['Saldo'].sum()
 
 def buat_laporan():
+    # Muat data menggunakan fungsi dari utils.py
     bukubesar, coa = load_data()
     if bukubesar is None or coa is None:
         return
@@ -93,3 +94,6 @@ def buat_laporan():
 def app():
     st.title("Laporan Realisasi Anggaran (LRA) - Optimized")
     buat_laporan()
+
+if __name__ == "__main__":
+    app()
