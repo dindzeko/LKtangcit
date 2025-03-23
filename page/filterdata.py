@@ -96,31 +96,6 @@ def app():
     }
     selected_kategori = st.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
 
-    # Tampilkan selectbox untuk akun berdasarkan level dan kategori yang dipilih
-    if selected_level:
-        # Pastikan session state level_options memiliki data untuk level yang dipilih
-        if selected_level in st.session_state["level_options"]:
-            # Filter akun berdasarkan kategori (awalan kode akun)
-            coa = pd.read_excel("data/coa.xlsx")
-            target_kategori_awalan = kategori_akun[selected_kategori]
-            filtered_akun = coa[
-                (coa["Level"] == int(selected_level.split()[-1])) &  # Sesuaikan dengan level
-                (coa["Kode Akun"].astype(str).str.startswith(target_kategori_awalan))  # Sesuaikan dengan kategori
-            ]["Nama Akun"].unique()
-
-            if len(filtered_akun) > 0:  # Pastikan ada opsi akun
-                selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
-            else:
-                st.warning(f"Tidak ada akun tersedia untuk {selected_level} dan kategori {selected_kategori}.")
-        else:
-            st.warning(f"Tidak ada data akun untuk {selected_level}.")
-
-    # 5. Filter berdasarkan Debit/Kredit/All
-    st.write("Pilih Tipe Transaksi:")
-    transaction_type = st.radio(
-        "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
-    )
-
     # Tombol untuk memproses data
     if st.button("Proses Data"):
         try:
@@ -149,18 +124,20 @@ def app():
                 # Ambil daftar SKPD unik dari data yang sudah difilter
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
-            # Filter berdasarkan Kode Level dan Akun
-            if selected_level and selected_akun:
+            # Filter berdasarkan Kode Level dan Kategori Akun
+            if selected_level:
                 target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
-                
-                # Filter berdasarkan level dan kategori akun
                 target_kategori_awalan = kategori_akun[selected_kategori]
+                
+                # Filter berdasarkan awalan kode akun sesuai dengan level
                 filtered_data = filtered_data[
-                    (merged_data["kd_lv_6"].astype(str).str.startswith(target_kategori_awalan)) &
-                    (merged_data["Nama Akun"] == selected_akun)
+                    filtered_data["kd_lv_6"].astype(str).str.startswith(target_kategori_awalan)
                 ]
 
             # Filter berdasarkan Debit/Kredit/All
+            transaction_type = st.radio(
+                "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
+            )
             if transaction_type == "Debet":
                 filtered_data = filtered_data[filtered_data["debet"] > 0]
             elif transaction_type == "Kredit":
