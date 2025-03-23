@@ -64,7 +64,7 @@ def app():
     level_options = [f"Level {i}" for i in range(1, 7)]
     selected_level = st.sidebar.selectbox("Kode Level", options=level_options)
 
-    # Tambahkan filter berdasarkan kategori akun
+    # 5. Filter berdasarkan Kategori Akun
     st.sidebar.write("Pilih Kategori Akun:")
     kategori_akun = {
         "PENDAPATAN DAERAH-LO": "7",
@@ -76,9 +76,27 @@ def app():
         "KEWAJIBAN": "2",
         "EKUITAS": "3"
     }
-    selected_kategori = st.sidebar.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
 
-    # 5. Filter berdasarkan Tipe Transaksi (Debet/Kredit/All)
+    # Tampilkan selectbox untuk kategori akun berdasarkan level yang dipilih
+    target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
+    filtered_kategoris = []
+    for kategori, awalan in kategori_akun.items():
+        # Cek apakah ada akun di level yang dipilih dengan awalan kategori
+        coa = pd.read_excel("data/coa.xlsx")
+        filtered_akun = coa[
+            (coa["Level"] == target_level) & 
+            (coa["Kode Akun"].astype(str).str.startswith(awalan))
+        ]["Nama Akun"].unique()
+        
+        if len(filtered_akun) > 0:
+            filtered_kategoris.append(kategori)
+    
+    if len(filtered_kategoris) > 0:
+        selected_kategori = st.sidebar.selectbox("Kategori Akun", options=filtered_kategoris)
+    else:
+        st.sidebar.warning(f"Tidak ada kategori akun tersedia untuk {selected_level}.")
+
+    # 6. Filter berdasarkan Tipe Transaksi (Debet/Kredit/All)
     st.sidebar.write("Pilih Tipe Transaksi:")
     transaction_type = st.sidebar.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], index=2
@@ -89,6 +107,7 @@ def app():
         try:
             # Baca file bukubesar.xlsb (data transaksi)
             bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+            
             # Baca file coa.xlsx (data COA untuk nama akun)
             coa = pd.read_excel("data/coa.xlsx")
             
@@ -99,26 +118,28 @@ def app():
             merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
 
             # Terapkan filter berdasarkan pilihan pengguna
+            # 1. Filter berdasarkan bulan
             filtered_data = merged_data[
                 (merged_data["tgl_transaksi"].dt.month >= selected_month[0]) &
                 (merged_data["tgl_transaksi"].dt.month <= selected_month[1])
             ]
 
-            # Filter berdasarkan jenis transaksi
+            # 2. Filter berdasarkan jenis transaksi
             filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
 
-            # Filter berdasarkan unit (SKPD atau All)
+            # 3. Filter berdasarkan unit (SKPD atau All)
             if selected_unit == "SKPD":
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
 
-            # Filter berdasarkan Kode Level dan Kategori Akun
+            # 4. Filter berdasarkan Kode Level dan Kategori Akun
             target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
             target_kategori_awalan = kategori_akun[selected_kategori]
             filtered_data = filtered_data[
-                filtered_data["kd_lv_6"].astype(str).str.startswith(target_kategori_awalan)
+                (filtered_data["Level"] == target_level) &  # Sesuaikan dengan level
+                (filtered_data["Kode Akun"].astype(str).str.startswith(target_kategori_awalan))  # Sesuaikan dengan kategori
             ]
 
-            # Filter berdasarkan Tipe Transaksi (Debet/Kredit/All)
+            # 5. Filter berdasarkan Tipe Transaksi (Debet/Kredit/All)
             if transaction_type == "Debet":
                 filtered_data = filtered_data[filtered_data["debet"] > 0]
             elif transaction_type == "Kredit":
