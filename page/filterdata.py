@@ -15,7 +15,9 @@ def app():
             level_options = {}
             for level in range(1, 7):
                 level_str = f"Level {level}"
-                level_options[level_str] = list(coa[coa["Level"].str.count(".") == level - 1]["Nama Akun"].unique())
+                level_options[level_str] = list(
+                    coa[coa["Level"].astype(str).str.count(".") == level - 1]["Nama Akun"].unique()
+                )
             
             st.session_state["level_options"] = level_options
         except Exception as e:
@@ -46,8 +48,9 @@ def app():
     selected_unit = st.radio("Unit", options=unit_options, index=0)
 
     if selected_unit == "SKPD":
-        # Tampilkan selectbox untuk memilih SKPD
-        selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
+        # Placeholder untuk nama SKPD (akan diisi nanti setelah data dimuat)
+        skpd_options = []
+        selected_skpd = None
 
     # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
     st.write("Pilih Kode Level:")
@@ -97,8 +100,8 @@ def app():
             if selected_level and selected_akun:
                 target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
                 filtered_data = filtered_data[
-                    (filtered_data["Level"].apply(lambda x: str(x).count(".") == target_level - 1) &
-                     filtered_data["Nama Akun"] == selected_akun)
+                    (filtered_data["Level"].astype(str).str.count(".") == target_level - 1) &
+                    (filtered_data["Nama Akun"] == selected_akun)
                 ]
 
             # Filter berdasarkan Debit/Kredit/All
