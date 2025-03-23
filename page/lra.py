@@ -1,184 +1,95 @@
 import streamlit as st
 import pandas as pd
+import numpy as np
 from io import BytesIO
 
-def app():
-    st.title("Laporan Realisasi Anggaran (LRA)")
+# Gunakan fungsi load_data dari utils.py
+from utils import load_data
 
-    # Baca file hanya sekali dan simpan di session state
-    if "bukubesar" not in st.session_state:
-        try:
-            st.session_state["bukubesar"] = pd.read_excel(
-                "data/bukubesar.xlsb",
-                engine="pyxlsb"
-            )
-        except Exception as e:
-            st.error(f"Gagal memuat data bukubesar: {str(e)}")
-            return
+def hitung_saldo_cepat(_df, kode_col, saldo_col):
+    """Fungsi teroptimasi untuk menghitung saldo hierarki"""
+    # Split kode akun menjadi komponen
+    split_codes = _df[kode_col].str.split('.', expand=True)
+    
+    # Generate semua parent code
+    parent_codes = []
+    for level in range(1, 7):
+        level_codes = split_codes.iloc[:, :level].agg('.'.join, axis=1)
+        parent_codes.append(level_codes)
+    
+    # Gabungkan dengan saldo
+    exploded = pd.concat([
+        pd.DataFrame({'Kode Rek': code, 'Saldo': _df[saldo_col]})
+        for code in parent_codes
+    ])
+    
+    # Group dan aggregasi
+    return exploded.groupby('Kode Rek', as_index=False)['Saldo'].sum()
 
-    if "coa" not in st.session_state:
-        try:
-            st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
-        except Exception as e:
-            st.error(f"Gagal memuat data coa: {str(e)}")
-            return
-
-    # Ambil DataFrame dari session state
-    bukubesar = st.session_state["bukubesar"]
-    coa = st.session_state["coa"]
-
-    # Perbaiki parsing kolom tgl_transaksi
-    try:
-        if "tgl_transaksi" in bukubesar.columns:
-            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
-            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"], 
-                    unit="D", 
-                    origin="1899-12-30"
-                )
-            else:
-                # Parsing tanggal dengan format dd/mm/yyyy
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"],
-                    format="%d/%m/%Y",
-                    errors="coerce"
-                )
-        else:
-            st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
-            return
-    except Exception as e:
-        st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
+def buat_laporan():
+    bukubesar, coa = load_data()
+    if bukubesar is None or coa is None:
         return
-
-    # Gabungkan bukubesar dengan COA untuk mendapatkan nama akun
-    merged_data = pd.merge(
+    
+    # Gabungkan data dengan merge cepat
+    merged = pd.merge(
         bukubesar,
         coa[["Kode Akun", "Nama Akun"]],
         left_on="kd_lv_6",
         right_on="Kode Akun",
         how="left"
     )
-
-    # Hitung saldo akun
-    merged_data["Saldo"] = merged_data["debet"] - merged_data["kredit"]
-
-    # Filter akun berdasarkan kategori (pendapatan, belanja, pembiayaan)
-    akun_pendapatan = merged_data[merged_data["Kode Akun"].astype(str).str.startswith("4")]
-    akun_belanja = merged_data[merged_data["Kode Akun"].astype(str).str.startswith("5")]
-    akun_pembiayaan = merged_data[merged_data["Kode Akun"].astype(str).str.startswith("6")]
-
-    # Fungsi untuk menghitung saldo berdasarkan hierarki kode
-    def hitung_saldo_akun(akun_df, prefix):
-        saldo_akun = {}
-        
-        # Loop melalui semua akun
-        for _, row in akun_df.iterrows():
-            kode_akun = row["Kode Akun"]
-            saldo = row["Saldo"]
-            
-            # Simpan saldo akun
-            saldo_akun[kode_akun] = saldo
-            
-            # Hitung total untuk setiap level
-            for level in range(1, 7):
-                parent_code = ".".join(kode_akun.split(".")[:level])
-                if parent_code not in saldo_akun:
-                    saldo_akun[parent_code] = 0
-                saldo_akun[parent_code] += saldo
-        
-        # Buat DataFrame dari saldo akun
-        df_saldo = pd.DataFrame(list(saldo_akun.items()), columns=["Kode Rek", "Saldo"])
-        df_saldo["Kode Rek"] = df_saldo["Kode Rek"].astype(str)
-        df_saldo["Uraian"] = df_saldo["Kode Rek"].apply(lambda x: f"{prefix} {x}")
-        return df_saldo.sort_values(by="Kode Rek")
-
-    # Hitung saldo untuk masing-masing kategori
-    saldo_pendapatan = hitung_saldo_akun(akun_pendapatan, "Pendapatan")
-    saldo_belanja = hitung_saldo_akun(akun_belanja, "Belanja")
-    saldo_pembiayaan = hitung_saldo_akun(akun_pembiayaan, "Pembiayaan")
-
-    # Hitung total pendapatan, belanja, dan surplus/defisit
-    total_pendapatan = saldo_pendapatan["Saldo"].sum()
-    total_belanja = saldo_belanja["Saldo"].sum()
-    surplus_defisit = total_pendapatan - total_belanja
-
-    # Hitung penerimaan dan pengeluaran pembiayaan
-    penerimaan_pembiayaan = saldo_pembiayaan[saldo_pembiayaan["Saldo"] > 0]["Saldo"].sum()
-    pengeluaran_pembiayaan = saldo_pembiayaan[saldo_pembiayaan["Saldo"] < 0]["Saldo"].sum()
-    pembiayaan_netto = penerimaan_pembiayaan + pengeluaran_pembiayaan
-
-    # Hitung SILPA/SIKPA
-    silpa_sikpa = surplus_defisit + pembiayaan_netto
-    if silpa_sikpa >= 0:
-        silpa_sikpa_label = "SILPA"
-    else:
-        silpa_sikpa_label = "SIKPA"
-
-    # Gabungkan semua komponen laporan
-    laporan_lra = pd.concat([saldo_pendapatan, saldo_belanja, saldo_pembiayaan], ignore_index=True)
-
-    # Tambahkan baris total pendapatan, belanja, surplus/defisit, dll.
-    laporan_lra = laporan_lra.append({
+    
+    # Hitung saldo dengan vectorized operation
+    merged["Saldo"] = merged["debet"] - merged["kredit"]
+    
+    # Filter dengan boolean indexing
+    mask_pendapatan = merged["Kode Akun"].str.startswith("4", na=False)
+    mask_belanja = merged["Kode Akun"].str.startswith("5", na=False)
+    mask_pembiayaan = merged["Kode Akun"].str.startswith("6", na=False)
+    
+    # Hitung saldo hierarki dengan fungsi cepat
+    saldo_pendapatan = hitung_saldo_cepat(merged[mask_pendapatan], "Kode Akun", "Saldo")
+    saldo_belanja = hitung_saldo_cepat(merged[mask_belanja], "Kode Akun", "Saldo")
+    saldo_pembiayaan = hitung_saldo_cepat(merged[mask_pembiayaan], "Kode Akun", "Saldo")
+    
+    # Gabungkan hasil
+    laporan = pd.concat([
+        saldo_pendapatan.assign(Uraian="Pendapatan " + saldo_pendapatan["Kode Rek"]),
+        saldo_belanja.assign(Uraian="Belanja " + saldo_belanja["Kode Rek"]),
+        saldo_pembiayaan.assign(Uraian="Pembiayaan " + saldo_pembiayaan["Kode Rek"])
+    ])
+    
+    # Hitung total dengan numpy untuk performa
+    totals = [
+        ("Jumlah Total Pendapatan", saldo_pendapatan["Saldo"].sum()),
+        ("Jumlah Total Belanja", saldo_belanja["Saldo"].sum()),
+        ("Surplus/Defisit", saldo_pendapatan["Saldo"].sum() - saldo_belanja["Saldo"].sum())
+    ]
+    
+    # Tambahkan total ke dataframe
+    total_df = pd.DataFrame([{
         "Kode Rek": "",
-        "Uraian": "Jumlah Total Pendapatan",
-        "Saldo": total_pendapatan
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": "Jumlah Total Belanja",
-        "Saldo": total_belanja
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": "Surplus/Defisit",
-        "Saldo": surplus_defisit
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": "Penerimaan Pembiayaan",
-        "Saldo": penerimaan_pembiayaan
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": "Pengeluaran Pembiayaan",
-        "Saldo": pengeluaran_pembiayaan
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": "Pembiayaan Netto",
-        "Saldo": pembiayaan_netto
-    }, ignore_index=True)
-
-    laporan_lra = laporan_lra.append({
-        "Kode Rek": "",
-        "Uraian": f"SILPA / SIKPA ({silpa_sikpa_label})",
-        "Saldo": silpa_sikpa
-    }, ignore_index=True)
-
-    # Format saldo menjadi Rupiah
-    laporan_lra["Saldo"] = laporan_lra["Saldo"].map(lambda x: f"Rp {x:,.0f}")
-
-    # Tampilkan laporan LRA
+        "Uraian": label,
+        "Saldo": np.sum(value)
+    } for label, value in totals])
+    
+    laporan = pd.concat([laporan, total_df], ignore_index=True)
+    
+    # Format mata uang
+    laporan["Saldo"] = laporan["Saldo"].map(lambda x: f"Rp {x:,.0f}")
+    
+    # Tampilkan hasil
     st.subheader("Laporan Realisasi Anggaran (LRA)")
-    st.dataframe(laporan_lra)
-
-    # Download hasil
+    st.dataframe(laporan)
+    
+    # Download
     output = BytesIO()
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
-        laporan_lra.to_excel(writer, index=False)
+        laporan.to_excel(writer, index=False)
     output.seek(0)
-    st.download_button(
-        "Unduh Excel",
-        data=output,
-        file_name="Laporan_LRA.xlsx",
-        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-    )
+    st.download_button("Unduh Laporan", output.getvalue(), file_name="LRA.xlsx")
 
-# Jalankan aplikasi
-app()
+def app():
+    st.title("Laporan Realisasi Anggaran (LRA) - Optimized")
+    buat_laporan()
