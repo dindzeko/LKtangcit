@@ -18,6 +18,13 @@ def app():
         st.error(f"Gagal memuat data: {str(e)}")
         return
 
+    # Pastikan kolom tgl_transaksi adalah datetime
+    try:
+        merged_data["tgl_transaksi"] = pd.to_datetime(merged_data["tgl_transaksi"], errors="coerce")
+    except Exception as e:
+        st.error(f"Gagal mengonversi kolom tgl_transaksi ke datetime: {str(e)}")
+        return
+
     # Widget filtering
     st.subheader("Filtering Data")
 
