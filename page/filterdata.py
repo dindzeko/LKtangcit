@@ -7,10 +7,10 @@ def app():
 
     # Load data
     try:
-        # Baca file bukubesar.xlsb
-        bukubesar = pd.read_excel("bukubesar.xlsb", engine="pyxlsb")
-        # Baca file coa.xlsx
-        coa = pd.read_excel("coa.xlsx")
+        # Baca file bukubesar.xlsb dari folder data/
+        bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+        # Baca file coa.xlsx dari folder data/
+        coa = pd.read_excel("data/coa.xlsx")
         
         # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
         merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
