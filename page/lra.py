@@ -44,10 +44,6 @@ def generate_lra():
     bukubesar["debet"] = pd.to_numeric(bukubesar["debet"], errors="coerce").fillna(0)
     bukubesar["kredit"] = pd.to_numeric(bukubesar["kredit"], errors="coerce").fillna(0)
     
-    # Fungsi untuk format mata uang
-    def format_currency(value):
-        return f"Rp {value:,.0f}" if pd.notnull(value) else "Rp 0"
-    
     # Fungsi rekursif untuk menghitung saldo hierarki
     def calculate_hierarchy(parent_code, level, df_coa, df_transaksi):
         """
