@@ -4,3 +4,4 @@ requests
 openpyxl
 pyxlsb
 streamlit-option-menu
+XlsxWriter
