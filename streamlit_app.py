@@ -1,12 +1,28 @@
 import streamlit as st
 from streamlit_option_menu import option_menu
 
-# Impor modul untuk halaman Filter Data
+# Fungsi untuk menambahkan CSS
+def add_css(css):
+    st.markdown(f'<style>{css}</style>', unsafe_allow_html=True)
+
+# CSS styling (kosongkan dulu untuk fokus perbaikan fungsional)
+css_styles = ""
+add_css(css_styles)
+
+# Impor modul-modul halaman dari folder `pages/`
 try:
-    from pages.filterdata import app as filterdata_app  # Mengimpor fungsi app dari filterdata.py
+    from pages.filterdata import app as filter_data_app
+    from pages.lra import app as lra_app
+    from pages.neraca import app as neraca_app
+    from pages.lo import app as lo_app
+    from pages.prosedur_analitis import app as prosedur_analitis_app
 except ImportError as e:
     st.error(f"Error importing modules: {str(e)}")
     st.stop()
+
+# Inisialisasi session state
+if "current_page" not in st.session_state:
+    st.session_state["current_page"] = "Main Page"
 
 # ----------- HALAMAN UTAMA -----------
 def main_page():
@@ -25,40 +41,28 @@ def main_page():
 
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
-    # Panggil fungsi app dari filterdata.py
-    filterdata_app()
+    st.title("Halaman Filter Data")
+    filter_data_app()
 
 # ----------- HALAMAN LRA -----------
 def lra_page():
     st.title("Halaman LRA")
-    st.write("Ini adalah halaman untuk Laporan Realisasi Anggaran (LRA).")
-    tahun = st.selectbox("Pilih Tahun:", ["2021", "2022", "2023"])
-    st.write(f"Menampilkan data LRA untuk tahun {tahun}.")
-    # Contoh: Tampilkan grafik atau tabel LRA (akan ditambahkan nanti)
+    lra_app()
 
 # ----------- HALAMAN NERACA -----------
 def neraca_page():
     st.title("Halaman Neraca")
-    st.write("Ini adalah halaman untuk Laporan Neraca.")
-    periode = st.radio("Pilih Periode:", ["Bulan", "Tahun"])
-    st.write(f"Menampilkan data neraca untuk periode {periode}.")
-    # Contoh: Tampilkan neraca dalam bentuk tabel atau grafik (akan ditambahkan nanti)
+    neraca_app()
 
 # ----------- HALAMAN LO -----------
 def lo_page():
     st.title("Halaman LO")
-    st.write("Ini adalah halaman untuk Laporan Operasional (LO).")
-    jenis_laporan = st.multiselect("Pilih Jenis Laporan:", ["Pendapatan", "Beban", "Laba Rugi"])
-    st.write(f"Menampilkan data LO untuk kategori: {', '.join(jenis_laporan)}.")
-    # Contoh: Tampilkan laporan operasional (akan ditambahkan nanti)
+    lo_app()
 
 # ----------- HALAMAN PROSEDUR ANALITIS -----------
 def prosedur_analitis_page():
     st.title("Halaman Prosedur Analitis")
-    st.write("Ini adalah halaman untuk melakukan analisis prosedural.")
-    metode_analisis = st.selectbox("Pilih Metode Analisis:", ["Analisis Varians", "Analisis Trend", "Analisis Rasio"])
-    st.write(f"Melakukan {metode_analisis}...")
-    # Contoh: Tambahkan logika analisis (akan ditambahkan nanti)
+    prosedur_analitis_app()
 
 # ----------- KONFIGURASI NAVIGASI -----------
 page_config = {
