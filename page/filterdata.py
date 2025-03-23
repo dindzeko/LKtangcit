@@ -11,12 +11,12 @@ def app():
             # Baca file coa.xlsx hanya untuk mendapatkan daftar akun berdasarkan level
             coa = pd.read_excel("data/coa.xlsx")
             
-            # Kelompokkan akun berdasarkan level
+            # Kelompokkan akun berdasarkan level (gunakan kolom Level secara langsung)
             level_options = {}
             for level in range(1, 7):
                 level_str = f"Level {level}"
                 level_options[level_str] = list(
-                    coa[coa["Level"].astype(str).str.count(".") == level - 1]["Nama Akun"].unique()
+                    coa[coa["Level"] == level]["Nama Akun"].unique()
                 )
             
             st.session_state["level_options"] = level_options
@@ -100,7 +100,7 @@ def app():
             if selected_level and selected_akun:
                 target_level = int(selected_level.split()[-1])  # Ambil angka dari string "Level X"
                 filtered_data = filtered_data[
-                    (filtered_data["Level"].astype(str).str.count(".") == target_level - 1) &
+                    (filtered_data["Level"] == target_level) &  # Gunakan kolom Level secara langsung
                     (filtered_data["Nama Akun"] == selected_akun)
                 ]
 
@@ -139,3 +139,6 @@ def app():
 
         except Exception as e:
             st.error(f"Gagal memuat atau memproses data: {str(e)}")
+
+# Panggil fungsi app
+app()
