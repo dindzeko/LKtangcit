@@ -141,7 +141,7 @@ def app():
     )
 
     # Tombol untuk memproses data
-    if st.button("Proses Data"):
+    if st.button("Proses Data", key="process_data_button"):  # Gunakan key unik
         try:
             # Gabungkan data berdasarkan kd_lv_6 dan Kode Akun
             merged_data = pd.merge(bukubesar, coa, left_on="kd_lv_6", right_on="Kode Akun", how="left")
@@ -215,7 +215,7 @@ def app():
 
             # Download hasil filter sebagai Excel
             st.subheader("Download Hasil Filter")
-            if st.button("Download Excel"):
+            if st.button("Download Excel", key="download_excel_button"):  # Gunakan key unik
                 output = BytesIO()
                 with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
                     display_data.to_excel(writer, index=False, sheet_name="Filtered Data")
