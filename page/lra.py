@@ -157,7 +157,7 @@ def generate_lra():
     # ======================= SURPLUS/DEFISIT =======================
     total_pendapatan = next((item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("4")), 0)
     total_belanja = next((item["Saldo"] for item in lra_data if item["Kode Rek"].startswith("5")), 0)
-    surplus_defisit = total_pendapatan - total_belanja
+    surplus_defisit = total_pendapatan + total_belanja
     logging.debug(f"Surplus/Defisit: {surplus_defisit}")
     lra_data.append({"Kode Rek": "", "Uraian": "Surplus/Defisit", "Saldo": surplus_defisit})
     
