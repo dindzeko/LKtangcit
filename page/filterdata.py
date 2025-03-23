@@ -5,6 +5,22 @@ from io import BytesIO
 def app():
     st.title("Filter Data Transaksi")
 
+    # Inisialisasi session state untuk menyimpan daftar SKPD
+    if "skpd_options" not in st.session_state:
+        try:
+            # Baca file bukubesar.xlsb hanya untuk mendapatkan daftar SKPD
+            bukubesar = pd.read_excel("data/bukubesar.xlsb", engine="pyxlsb")
+            
+            # Pastikan kolom nm_unit ada dan tidak kosong
+            if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
+                raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
+            
+            skpd_options = list(bukubesar["nm_unit"].dropna().unique())
+            st.session_state["skpd_options"] = skpd_options
+        except Exception as e:
+            st.error(f"Gagal memuat daftar SKPD: {str(e)}")
+            return
+
     # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
     if "level_options" not in st.session_state:
         try:
@@ -51,10 +67,15 @@ def app():
     unit_options = ["All", "SKPD"]
     selected_unit = st.radio("Unit", options=unit_options, index=0)
 
+    # Inisialisasi variabel untuk SKPD
+    selected_skpd = None
+
     if selected_unit == "SKPD":
-        # Placeholder untuk nama SKPD (akan diisi nanti setelah data dimuat)
-        skpd_options = []
-        selected_skpd = None
+        # Tampilkan selectbox untuk memilih SKPD
+        if "skpd_options" in st.session_state and st.session_state["skpd_options"]:
+            selected_skpd = st.selectbox("Pilih SKPD", options=st.session_state["skpd_options"])
+        else:
+            st.warning("Daftar SKPD tidak tersedia. Silakan periksa file data.")
 
     # 4. Filter berdasarkan Kode Level (Level 1 sampai Level 6)
     st.write("Pilih Kode Level:")
