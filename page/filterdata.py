@@ -12,6 +12,10 @@ def app():
                 "data/bukubesar.xlsb",
                 engine="pyxlsb"
             )
+            # Pastikan kolom numerik bersih
+            st.session_state["bukubesar"]["debet"] = pd.to_numeric(st.session_state["bukubesar"]["debet"], errors="coerce")
+            st.session_state["bukubesar"]["kredit"] = pd.to_numeric(st.session_state["bukubesar"]["kredit"], errors="coerce")
+            st.session_state["bukubesar"] = st.session_state["bukubesar"].dropna(subset=["debet", "kredit"])
         except Exception as e:
             st.error(f"Gagal memuat data bukubesar: {str(e)}")
             return
@@ -19,6 +23,8 @@ def app():
     if "coa" not in st.session_state:
         try:
             st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
+            # Pastikan kolom "Kode Akun" adalah string
+            st.session_state["coa"]["Kode Akun"] = st.session_state["coa"]["Kode Akun"].astype(str)
         except Exception as e:
             st.error(f"Gagal memuat data coa: {str(e)}")
             return
@@ -30,20 +36,11 @@ def app():
     # Perbaiki parsing kolom tgl_transaksi
     try:
         if "tgl_transaksi" in bukubesar.columns:
-            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
-            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"], 
-                    unit="D", 
-                    origin="1899-12-30"
-                )
-            else:
-                # Parsing tanggal dengan format dd/mm/yyyy
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"],
-                    format="%d/%m/%Y",
-                    errors="coerce"
-                )
+            bukubesar["tgl_transaksi"] = pd.to_datetime(
+                bukubesar["tgl_transaksi"],
+                format="%d/%m/%Y",
+                errors="coerce"
+            )
         else:
             st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
             return
@@ -211,7 +208,7 @@ def app():
             
             # Generate nama file dinamis
             unit_name = selected_skpd if selected_unit == "SKPD" else "All"
-            file_name = f"{unit_name}_{selected_level}_{selected_akun}.xlsx"
+            file_name = f"{unit_name}_{str(selected_level)}_{selected_akun}.xlsx"
             
             # Tampilkan hasil filter
             st.subheader("Hasil Filter")
@@ -238,4 +235,5 @@ def app():
             st.error(f"Terjadi kesalahan: {str(e)}")
 
 # Jalankan aplikasi
-app()
+if __name__ == "__main__":
+    app()
