@@ -27,24 +27,6 @@ def app():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
 
-    # Menampilkan ringkasan data buku besar yang berhasil dibaca
-    st.subheader("Ringkasan Data Buku Besar")
-    try:
-        # Hitung jumlah transaksi
-        total_transactions = bukubesar["jns_transaksi"].count()
-        # Hitung total debet dan kredit
-        total_debet = bukubesar["debet"].sum()
-        total_kredit = bukubesar["kredit"].sum()
-
-        # Tampilkan hasil
-        st.write(f"Jumlah Transaksi (Count): {total_transactions}")
-        st.write(f"Total Debet: Rp {total_debet:,.0f}")
-        st.write(f"Total Kredit: Rp {total_kredit:,.0f}")
-    except Exception as e:
-        st.error(f"Gagal menghitung ringkasan data buku besar: {str(e)}")
-    
-    st.markdown("---")
-
     # Perbaiki parsing kolom tgl_transaksi
     try:
         if "tgl_transaksi" in bukubesar.columns:
