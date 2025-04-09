@@ -54,7 +54,6 @@ def main_page():
 
 # ----------- HALAMAN FILTER DATA -----------
 def filter_data_page():
-    st.title("Halaman Filter Data")
     filter_data_app()
 
 # ----------- HALAMAN LRA -----------
