@@ -73,7 +73,7 @@ def app():
             for level in range(1, 7):
                 level_str = f"Level {level}"
                 level_options[level_str] = list(
-                    coa[coa["Level"] == level]["Nama Akun"].unique()
+                    coa[coa["Level"] == level]["Nama Akun 6"].unique()
                 )
             
             st.session_state["level_options"] = level_options
@@ -139,8 +139,8 @@ def app():
         target_kategori = kategori_akun[selected_kategori]
         filtered_akun = coa[
             (coa["Level"] == target_level) & 
-            (coa["Kode Akun"].astype(str).str.startswith(target_kategori))
-        ]["Nama Akun"].unique()
+            (coa["Kode Akun 6"].astype(str).str.startswith(target_kategori))
+        ]["Nama Akun 6"].unique()
         
         if len(filtered_akun) > 0:
             selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
@@ -178,9 +178,9 @@ def app():
             if selected_akun:
                 target_level = int(selected_level.split()[-1])
                 kode_akun = coa[
-                    (coa["Nama Akun"] == selected_akun) & 
+                    (coa["Nama Akun 6"] == selected_akun) & 
                     (coa["Level"] == target_level)
-                ]["Kode Akun"].iloc[0]
+                ]["Kode Akun 6"].iloc[0]
                 
                 # Filter kd_lv_6 yang termasuk dalam hierarki kode terpilih
                 filtered_data = filtered_data[
@@ -196,9 +196,9 @@ def app():
             # Gabungkan dengan COA untuk tampilkan nama akun
             merged_data = pd.merge(
                 filtered_data,
-                coa[["Kode Akun", "Nama Akun"]],
+                coa[["Kode Akun 6", "Nama Akun 6"]],
                 left_on="kd_lv_6",
-                right_on="Kode Akun",
+                right_on="Kode Akun 6",
                 how="left"
             )
             
@@ -218,7 +218,7 @@ def app():
             top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
             display_data = merged_data.head(top_n)[[
                 "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit",
-                "kd_lv_6", "Nama Akun", "debet", "kredit", "uraian"
+                "kd_lv_6", "Nama Akun 6", "debet", "kredit", "uraian"
             ]]
             st.dataframe(display_data)
             
