@@ -114,7 +114,7 @@ def app():
     st.markdown("---")
 
     # 4. Filter Kategori Akun
-    st.write("### Pilih Kategori Akun:")
+    st.write("### Pilih Akun Induk:")
     if target_level == 1:
         # Khusus Level 1 menggunakan mapping tetap
         kategori_options = list(level1_mapping.values())
