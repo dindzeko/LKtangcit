@@ -70,39 +70,13 @@ def app():
     st.subheader("Filter Data")
     st.markdown("---")
 
-    # 1. Filter Bulan
-    st.write("### Pilih Bulan:")
-    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
-    st.markdown("---")
-
-    # 2. Filter Jenis Transaksi
-    st.write("### Pilih Jenis Transaksi:")
-    jenis_transaksi_options = [
-        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
-        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
-        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
-    ]
-    selected_jenis_transaksi = st.multiselect(
-        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
-    )
-    st.markdown("---")
-
-    # 3. Filter Unit (SKPD atau All)
-    st.write("### Pilih Unit:")
-    selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
-    selected_skpd = None
-    if selected_unit == "SKPD":
-        skpd_options = bukubesar["nm_unit"].unique()
-        selected_skpd = st.selectbox("Pilih SKPD", skpd_options)
-    st.markdown("---")
-
-    # 4. Filter Level Akun
+    # 1. Filter Level Akun
     st.write("### Pilih Level Akun:")
     selected_level = st.selectbox("Level", options=[f"Level {i}" for i in range(1, 7)])
     target_level = int(selected_level.split()[-1])
     st.markdown("---")
 
-    # 5. Filter Kategori Akun
+    # 2. Filter Kategori Akun
     st.write("### Pilih Kategori Akun:")
     if target_level == 1:
         # Khusus Level 1 menggunakan mapping tetap
@@ -130,7 +104,7 @@ def app():
 
     st.markdown("---")
 
-    # 6. Filter Akun Spesifik
+    # 3. Filter Akun Spesifik
     st.write("### Pilih Akun:")
     target_col = f"Kode Akun {target_level}"
     filtered_coa = coa[coa[target_col].fillna("").astype(str).str.startswith(selected_kode)]
@@ -147,7 +121,7 @@ def app():
     
     st.markdown("---")
 
-    # 7. Filter Tipe Transaksi (Debet/Kredit/All)
+    # 4. Filter Tipe Transaksi (Debet/Kredit/All)
     st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -159,26 +133,20 @@ def app():
         try:
             filtered_data = bukubesar.copy()
             
-            # 1. Filter bulan
-            bulan_condition = (
-                (filtered_data["tgl_transaksi"].dt.month >= selected_month[0]) &
-                (filtered_data["tgl_transaksi"].dt.month <= selected_month[1])
-            )
-            filtered_data = filtered_data[bulan_condition]
+            # 1. Bersihkan kolom debet dan kredit dari nilai non-numerik
+            filtered_data["debet"] = pd.to_numeric(filtered_data["debet"], errors="coerce")
+            filtered_data["kredit"] = pd.to_numeric(filtered_data["kredit"], errors="coerce")
             
-            # 2. Filter jenis transaksi
-            filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+            # 2. Ganti nilai NaN dengan 0
+            filtered_data["debet"] = filtered_data["debet"].fillna(0)
+            filtered_data["kredit"] = filtered_data["kredit"].fillna(0)
             
-            # 3. Filter unit
-            if selected_unit == "SKPD" and selected_skpd:
-                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
-            
-            # 4. Filter akun berdasarkan kategori
+            # 3. Filter akun berdasarkan kategori
             filtered_data = filtered_data[
                 filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
             ]
             
-            # 5. Filter tipe transaksi
+            # 4. Filter tipe transaksi
             if transaction_type == "Debet":
                 filtered_data = filtered_data[filtered_data["debet"] > 0]
             elif transaction_type == "Kredit":
