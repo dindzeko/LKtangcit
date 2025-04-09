@@ -27,40 +27,27 @@ def app():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
 
-    # Perbaiki parsing kolom tgl_transaksi
-    try:
-        if "tgl_transaksi" in bukubesar.columns:
-            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
-            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"], 
-                    unit="D", 
-                    origin="1899-12-30"
-                )
-            else:
-                # Parsing tanggal dengan format dd/mm/yyyy
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"],
-                    format="%d/%m/%Y",
-                    errors="coerce"
-                )
-        else:
-            st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
-            return
-    except Exception as e:
-        st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
-        return
-
-    # Inisialisasi session state untuk menyimpan daftar SKPD
-    if "skpd_options" not in st.session_state:
+    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
+    if "level_options" not in st.session_state:
         try:
-            if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
-                raise ValueError("Kolom 'nm_unit' tidak ditemukan atau kosong.")
+            # Pastikan kolom-kolom yang diperlukan ada di DataFrame coa
+            required_columns = [f"Kode Akun {i}" for i in range(1, 7)]
+            if any(col not in coa.columns for col in required_columns):
+                raise ValueError("Kolom 'Kode Akun' tidak ditemukan.")
+
+            level_options = {}
+            for level in range(1, 7):
+                level_col = f"Kode Akun {level}"
+                name_col = f"Nama Akun {level}"
+                
+                # Dapatkan daftar kategori akun untuk level tertentu
+                level_options[f"Level {level}"] = list(
+                    coa[[level_col, name_col]].drop_duplicates()[name_col]
+                )
             
-            skpd_options = list(bukubesar["nm_unit"].dropna().unique())
-            st.session_state["skpd_options"] = skpd_options
+            st.session_state["level_options"] = level_options
         except Exception as e:
-            st.error(f"Gagal memuat daftar SKPD: {str(e)}")
+            st.error(f"Gagal memuat daftar akun: {str(e)}")
             return
 
     # Widget filtering
