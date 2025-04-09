@@ -27,6 +27,30 @@ def app():
     bukubesar = st.session_state["bukubesar"]
     coa = st.session_state["coa"]
 
+    # Perbaiki parsing kolom tgl_transaksi
+    try:
+        if "tgl_transaksi" in bukubesar.columns:
+            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
+            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"], 
+                    unit="D", 
+                    origin="1899-12-30"
+                )
+            else:
+                # Parsing tanggal dengan format dd/mm/yyyy
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"],
+                    format="%d/%m/%Y",
+                    errors="coerce"
+                )
+        else:
+            st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
+            return
+    except Exception as e:
+        st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
+        return
+
     # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
     if "level_options" not in st.session_state:
         try:
@@ -107,8 +131,9 @@ def app():
     selected_kode = kategori_akun[kategori_akun[name_col] == selected_kategori][level_col].iloc[0]
 
     # Filter akun berdasarkan level dan kategori
+    # Menggunakan .fillna("") untuk mengatasi nilai NaN
     filtered_akun = coa[
-        coa[level_col].astype(str).str.startswith(selected_kode)
+        coa[level_col].fillna("").astype(str).str.startswith(selected_kode)
     ]["Nama Akun 6"].unique()
 
     if len(filtered_akun) > 0:
