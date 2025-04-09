@@ -3,7 +3,7 @@ import pandas as pd
 from io import BytesIO
 
 def app():
-    st.title("Filter Data Transaksi")
+    st.title("Buku Besar Transaksi")
 
     # ================== DATA LOADING ==================
     if "bukubesar" not in st.session_state:
