@@ -121,7 +121,16 @@ def app():
     
     st.markdown("---")
 
-    # 4. Filter Tipe Transaksi (Debet/Kredit/All)
+    # 4. Filter Unit (SKPD atau All)
+    st.write("### Pilih Unit:")
+    selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
+    selected_skpd = None
+    if selected_unit == "SKPD":
+        skpd_options = bukubesar["nm_unit"].unique()
+        selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
+    st.markdown("---")
+
+    # 5. Filter Tipe Transaksi (Debet/Kredit/All)
     st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -133,24 +142,28 @@ def app():
         try:
             filtered_data = bukubesar.copy()
             
-            # 1. Bersihkan kolom debet dan kredit dari nilai non-numerik
+            # Bersihkan kolom debet dan kredit dari nilai non-numerik
             filtered_data["debet"] = pd.to_numeric(filtered_data["debet"], errors="coerce")
             filtered_data["kredit"] = pd.to_numeric(filtered_data["kredit"], errors="coerce")
             
-            # 2. Ganti nilai NaN dengan 0
+            # Ganti nilai NaN dengan 0
             filtered_data["debet"] = filtered_data["debet"].fillna(0)
             filtered_data["kredit"] = filtered_data["kredit"].fillna(0)
             
-            # 3. Filter akun berdasarkan kategori
+            # Filter akun berdasarkan kategori
             filtered_data = filtered_data[
                 filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
             ]
             
-            # 4. Filter tipe transaksi
+            # Filter tipe transaksi
             if transaction_type == "Debet":
                 filtered_data = filtered_data[filtered_data["debet"] > 0]
             elif transaction_type == "Kredit":
                 filtered_data = filtered_data[filtered_data["kredit"] > 0]
+            
+            # Filter unit
+            if selected_unit == "SKPD" and selected_skpd:
+                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
             
             # Gabungkan dengan COA untuk tampilkan nama akun
             merged_data = pd.merge(
