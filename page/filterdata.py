@@ -1,100 +1,191 @@
-import pandas as pd
 import streamlit as st
+import pandas as pd
+from io import BytesIO
 
-# Fungsi utama
-def main():
-    # Judul aplikasi
-    st.title("Filter Data Berdasarkan Hierarki Akun COA")
+def app():
+    st.title("Filter Data Transaksi")
 
-    # Upload file COA
-    uploaded_file = st.file_uploader("Upload File COA (CSV)", type=["csv"])
-    if uploaded_file is not None:
-        coa = pd.read_csv(uploaded_file)
-
-        # Validasi format COA
-        required_columns = [f"Kode Akun {i}" for i in range(1, 7)] + [f"Nama Akun {i}" for i in range(1, 7)]
-        if any(col not in coa.columns for col in required_columns):
-            st.error("Format COA tidak valid. Pastikan kolom Kode Akun dan Nama Akun 1-6 ada.")
+    # ================== DATA LOADING ==================
+    if "bukubesar" not in st.session_state:
+        try:
+            st.session_state["bukubesar"] = pd.read_excel(
+                "data/bukubesar.xlsb",
+                engine="pyxlsb"
+            )
+        except Exception as e:
+            st.error(f"Gagal memuat data bukubesar: {str(e)}")
             return
 
-        # 1. Pilih Jenis Laporan
-        st.write("### Pilih Jenis Laporan:")
-        jenis_laporan = {
-            "1": "ASET",
-            "2": "KEWAJIBAN",
-            "3": "EKUITAS",
-            "4": "PENDAPATAN DAERAH",
-            "5": "BELANJA DAERAH",
-            "6": "PEMBIAYAAN DAERAH",
-            "7": "PENDAPATAN DAERAH-LO",
-            "8": "BEBAN DAERAH"
-        }
-        selected_jenis = st.selectbox("Jenis Laporan", options=jenis_laporan.keys(), format_func=lambda x: f"{x} - {jenis_laporan[x]}")
-
-        # Filter data berdasarkan jenis laporan (Level 1)
-        level_col = "Kode Akun 1"
-        name_col = "Nama Akun 1"
-
-        if level_col not in coa.columns or name_col not in coa.columns:
-            st.error(f"Kolom {level_col} atau {name_col} tidak ditemukan!")
+    if "coa" not in st.session_state:
+        try:
+            st.session_state["coa"] = pd.read_excel("data/coa.xlsx")
+            # Konversi semua kode akun ke string
+            for col in st.session_state["coa"].columns:
+                if 'Kode Akun' in col:
+                    st.session_state["coa"][col] = st.session_state["coa"][col].astype(str).str.strip()
+        except Exception as e:
+            st.error(f"Gagal memuat data coa: {str(e)}")
             return
 
-        filtered_coa = coa[
-            (coa[level_col].astype(str).str.strip() == selected_jenis) &
-            (coa[name_col].notna())
-        ]
+    bukubesar = st.session_state["bukubesar"]
+    coa = st.session_state["coa"]
 
-        if filtered_coa.empty:
-            st.error(f"Tidak ditemukan data untuk jenis laporan: {jenis_laporan[selected_jenis]}")
+    # ================== PREPROCESSING ==================
+    try:
+        if "tgl_transaksi" in bukubesar.columns:
+            bukubesar["tgl_transaksi"] = pd.to_datetime(
+                bukubesar["tgl_transaksi"], 
+                errors="coerce"
+            )
+            bukubesar = bukubesar.dropna(subset=["tgl_transaksi"])
+        else:
+            st.error("Kolom 'tgl_transaksi' tidak ditemukan")
             return
+    except Exception as e:
+        st.error(f"Gagal memproses tanggal: {str(e)}")
+        return
 
-        # 2. Pilih Level Akun
-        st.write("### Pilih Level Akun:")
-        level_options = [f"Level {i}" for i in range(1, 7)]
-        selected_level = st.selectbox("Level Akun", options=level_options)
+    # ================== LEVEL 1 CATEGORIES ==================
+    level1_mapping = {
+        '1': 'ASET',
+        '2': 'KEWAJIBAN',
+        '3': 'EKUITAS', 
+        '4': 'PENDAPATAN DAERAH',
+        '5': 'BELANJA DAERAH',
+        '6': 'PEMBIAYAAN DAERAH',
+        '7': 'PENDAPATAN DAERAH-LO',
+        '8': 'BEBAN DAERAH'
+    }
 
-        # 3. Pilih Kategori Akun
-        st.write("### Pilih Kategori Akun:")
-        target_level = int(selected_level.split()[-1])
-        level_col = f"Kode Akun {target_level}"
-        name_col = f"Nama Akun {target_level}"
+    # ================== WIDGET FILTER ==================
+    st.subheader("Filter Data")
+    st.markdown("---")
 
-        # Validasi kolom
-        if level_col not in coa.columns or name_col not in coa.columns:
-            st.error(f"Kolom {level_col} atau {name_col} tidak ditemukan!")
+    # 1. Filter Unit
+    st.write("### Pilih Unit:")
+    selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
+    selected_skpd = None
+    if selected_unit == "SKPD":
+        skpd_options = bukubesar["nm_unit"].unique()
+        selected_skpd = st.selectbox("Pilih SKPD", skpd_options)
+    st.markdown("---")
+
+    # 2. Filter Level Akun
+    st.write("### Pilih Level Akun:")
+    selected_level = st.selectbox("Level", options=[f"Level {i}" for i in range(1, 7)])
+    target_level = int(selected_level.split()[-1])
+    st.markdown("---")
+
+    # 3. Filter Kategori Akun
+    st.write("### Pilih Kategori Akun:")
+    
+    if target_level == 1:
+        # Khusus Level 1 menggunakan mapping tetap
+        kategori_options = list(level1_mapping.values())
+        selected_kategori = st.selectbox("Kategori", options=kategori_options)
+        
+        # Dapatkan kode awalan dari mapping
+        selected_kode = [k for k, v in level1_mapping.items() if v == selected_kategori][0]
+    else:
+        # Untuk level 2-6 ambil dari struktur COA
+        parent_level = target_level - 1
+        parent_col = f"Kode Akun {parent_level}"
+        
+        # Validasi struktur hierarki
+        if parent_col not in coa.columns:
+            st.error(f"Struktur COA tidak valid untuk level {target_level}")
             return
+        
+        # Ambil kategori berdasarkan level parent
+        kategori_options = coa[[parent_col, f"Nama Akun {parent_level}"]]
+        kategori_options = kategori_options.drop_duplicates().dropna()
+        
+        selected_parent = st.selectbox(
+            "Kategori Induk",
+            options=kategori_options[f"Nama Akun {parent_level}"]
+        )
+        
+        # Dapatkan kode parent
+        selected_kode = kategori_options[
+            kategori_options[f"Nama Akun {parent_level}"] == selected_parent
+        ][parent_col].iloc[0]
 
-        # Ambil kategori akun berdasarkan hierarki
-        kategori_akun = filtered_coa[
-            (filtered_coa[level_col].notna()) & 
-            (filtered_coa[name_col].notna())
-        ][[level_col, name_col]].drop_duplicates()
+    st.markdown("---")
 
-        # Konversi ke string dan strip whitespace
-        kategori_akun[level_col] = kategori_akun[level_col].astype(str).str.strip()
-        kategori_akun[name_col] = kategori_akun[name_col].str.strip()
+    # 4. Filter Akun Spesifik
+    st.write("### Pilih Akun:")
+    target_col = f"Kode Akun {target_level}"
+    
+    # Filter berdasarkan kode parent
+    filtered_coa = coa[coa[target_col].str.startswith(selected_kode)]
+    akun_options = filtered_coa[f"Nama Akun {target_level}"].unique()
+    
+    if len(akun_options) > 0:
+        selected_akun = st.selectbox("Nama Akun", akun_options)
+        kode_akun = filtered_coa[
+            filtered_coa[f"Nama Akun {target_level}"] == selected_akun
+        ][target_col].iloc[0]
+    else:
+        st.warning("Tidak ada akun tersedia")
+        return
+    
+    st.markdown("---")
 
-        if kategori_akun.empty:
-            st.error(f"Tidak ditemukan kategori akun untuk Level {target_level}.")
-            return
+    # ================== PROCESS DATA ==================
+    if st.button("Proses Data"):
+        try:
+            # Filter dasar
+            filtered_data = bukubesar[
+                (bukubesar["kd_lv_6"].str.startswith(kode_akun)) &
+                (bukubesar["jns_transaksi"].notna())
+            ]
+            
+            # Filter tambahan
+            if selected_unit == "SKPD" and selected_skpd:
+                filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
+            
+            # Gabungkan dengan data COA
+            merged_data = pd.merge(
+                filtered_data,
+                coa[["Kode Akun 6", "Nama Akun 6"]],
+                left_on="kd_lv_6",
+                right_on="Kode Akun 6",
+                how="left"
+            )
+            
+            # Hitung saldo akun
+            saldo_akun = merged_data["debet"].sum() - merged_data["kredit"].sum()
+            
+            # Tampilkan saldo akun di atas tabel hasil filter
+            st.subheader("Saldo Akun")
+            st.write(f"Saldo ({selected_akun}): Rp {saldo_akun:,.0f}")
+            
+            # Generate nama file dinamis
+            unit_name = selected_skpd if selected_unit == "SKPD" else "All"
+            file_name = f"{unit_name}_{selected_level}_{selected_akun}.xlsx"
+            
+            # Tampilkan hasil filter
+            st.subheader("Hasil Filter")
+            top_n = st.number_input("Tampilkan Berapa Baris Teratas?", min_value=1, value=20)
+            display_data = merged_data.head(top_n)[[
+                "no_bukti", "tgl_transaksi", "jns_transaksi", "nm_unit",
+                "kd_lv_6", "Nama Akun 6", "debet", "kredit", "uraian"
+            ]]
+            st.dataframe(display_data)
+            
+            # Download hasil
+            output = BytesIO()
+            with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
+                merged_data.to_excel(writer, index=False)
+            output.seek(0)
+            st.download_button(
+                "Unduh Excel",
+                data=output,
+                file_name=file_name,
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+            
+        except Exception as e:
+            st.error(f"Terjadi kesalahan: {str(e)}")
 
-        selected_kategori = st.selectbox("Kategori Akun", options=kategori_akun[name_col])
-
-        # Dapatkan kode akun yang sesuai
-        selected_kode = kategori_akun[
-            kategori_akun[name_col] == selected_kategori
-        ][level_col].iloc[0]
-
-        # Filter akun level 6 berdasarkan hierarki
-        filtered_akun = coa[
-            (coa[level_col].astype(str).str.startswith(str(selected_kode).strip())) &
-            (coa["Nama Akun 6"].notna())
-        ]["Nama Akun 6"].unique()
-
-        # Tampilkan hasil
-        st.write("### Daftar Akun Level 6:")
-        st.write(filtered_akun)
-
-# Jalankan aplikasi
-if __name__ == "__main__":
-    main()
+app()
