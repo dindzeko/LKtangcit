@@ -107,6 +107,11 @@ def app():
     level_col = f"Kode Akun {target_level}"
     name_col = f"Nama Akun {target_level}"
     
+    # Validasi kolom level yang dipilih
+    if level_col not in coa.columns:
+        st.error(f"Kolom '{level_col}' tidak ditemukan dalam file COA.")
+        return
+    
     # Daftar kategori akun berdasarkan level yang dipilih
     kategori_akun = coa[[level_col, name_col]].drop_duplicates()
     selected_kategori = st.selectbox("Kategori Akun", options=kategori_akun[name_col])
