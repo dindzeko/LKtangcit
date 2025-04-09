@@ -121,7 +121,19 @@ def app():
     
     st.markdown("---")
 
-    # 4. Filter Unit (SKPD atau All)
+    # 4. Filter Jenis Transaksi
+    st.write("### Pilih Jenis Transaksi:")
+    jenis_transaksi_options = [
+        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
+        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
+        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
+    ]
+    selected_jenis_transaksi = st.multiselect(
+        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
+    )
+    st.markdown("---")
+
+    # 5. Filter Unit (SKPD atau All)
     st.write("### Pilih Unit:")
     selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
     selected_skpd = None
@@ -130,7 +142,7 @@ def app():
         selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
     st.markdown("---")
 
-    # 5. Filter Tipe Transaksi (Debet/Kredit/All)
+    # 6. Filter Tipe Transaksi (Debet/Kredit/All)
     st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -154,6 +166,10 @@ def app():
             filtered_data = filtered_data[
                 filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
             ]
+            
+            # Filter jenis transaksi
+            if selected_jenis_transaksi:
+                filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
             
             # Filter tipe transaksi
             if transaction_type == "Debet":
