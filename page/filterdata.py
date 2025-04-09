@@ -30,20 +30,12 @@ def app():
     # Perbaiki parsing kolom tgl_transaksi
     try:
         if "tgl_transaksi" in bukubesar.columns:
-            # Jika kolom tgl_transaksi berisi nilai numerik (serial Excel)
-            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"], 
-                    unit="D", 
-                    origin="1899-12-30"
-                )
-            else:
-                # Parsing tanggal dengan format dd/mm/yyyy
-                bukubesar["tgl_transaksi"] = pd.to_datetime(
-                    bukubesar["tgl_transaksi"],
-                    format="%d/%m/%Y",
-                    errors="coerce"
-                )
+            # Parsing tanggal dengan format dd/mm/yyyy atau serial Excel
+            bukubesar["tgl_transaksi"] = pd.to_datetime(
+                bukubesar["tgl_transaksi"],
+                format="%d/%m/%Y",
+                errors="coerce"
+            )
         else:
             st.error("Kolom 'tgl_transaksi' tidak ditemukan dalam file bukubesar.")
             return
@@ -51,7 +43,11 @@ def app():
         st.error(f"Gagal memproses kolom tgl_transaksi: {str(e)}")
         return
 
-    # Inisialisasi session state untuk menyimpan daftar SKPD
+    # Pastikan kolom debet dan kredit adalah numerik
+    bukubesar["debet"] = pd.to_numeric(bukubesar["debet"], errors="coerce")
+    bukubesar["kredit"] = pd.to_numeric(bukubesar["kredit"], errors="coerce")
+
+    # Inisialisasi session state untuk daftar SKPD
     if "skpd_options" not in st.session_state:
         try:
             if "nm_unit" not in bukubesar.columns or bukubesar["nm_unit"].isnull().all():
@@ -63,7 +59,7 @@ def app():
             st.error(f"Gagal memuat daftar SKPD: {str(e)}")
             return
 
-    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
+    # Inisialisasi session state untuk daftar akun berdasarkan level
     if "level_options" not in st.session_state:
         try:
             if "Level" not in coa.columns or coa["Level"].isnull().all():
@@ -167,12 +163,21 @@ def app():
             )
             filtered_data = filtered_data[bulan_condition]
             
+            # Debugging hasil filter bulan
+            st.write(f"Data setelah filter bulan: {filtered_data.shape}")
+            
             # 2. Filter jenis transaksi
             filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+            
+            # Debugging hasil filter jenis transaksi
+            st.write(f"Data setelah filter jenis transaksi: {filtered_data.shape}")
             
             # 3. Filter unit
             if selected_unit == "SKPD" and selected_skpd:
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
+            
+            # Debugging hasil filter unit
+            st.write(f"Data setelah filter unit: {filtered_data.shape}")
             
             # 4. Filter akun berdasarkan hierarki kode
             if selected_akun:
@@ -187,11 +192,17 @@ def app():
                     filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
                 ]
             
+            # Debugging hasil filter akun
+            st.write(f"Data setelah filter akun: {filtered_data.shape}")
+            
             # 5. Filter tipe transaksi
             if transaction_type == "Debet":
                 filtered_data = filtered_data[filtered_data["debet"] > 0]
             elif transaction_type == "Kredit":
                 filtered_data = filtered_data[filtered_data["kredit"] > 0]
+            
+            # Debugging hasil filter tipe transaksi
+            st.write(f"Data setelah filter tipe transaksi: {filtered_data.shape}")
             
             # Gabungkan dengan COA untuk tampilkan nama akun
             merged_data = pd.merge(
