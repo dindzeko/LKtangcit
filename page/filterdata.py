@@ -172,7 +172,7 @@ def app():
             if selected_akun:
                 kode_akun = coa[
                     coa["Nama Akun 6"] == selected_akun
-                ]["Kode Akun 6"].iloc[0]
+                ][f"Kode Akun {target_level}"].iloc[0]
                 
                 # Filter kd_lv_6 yang termasuk dalam hierarki kode terpilih
                 filtered_data = filtered_data[
