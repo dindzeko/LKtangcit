@@ -124,7 +124,7 @@ def app():
     # 4. Filter Jenis Transaksi
     st.write("### Pilih Jenis Transaksi:")
     jenis_transaksi_options = [
-        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
+        "Jurnal Balik","Jurnal Eliminasi", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
         "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
         "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
     ]
