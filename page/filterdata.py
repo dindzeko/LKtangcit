@@ -142,7 +142,7 @@ def app():
     st.markdown("---")
 
     # 5. Filter Akun Spesifik
-    st.write("### Pilih Akun:")
+    st.write("### Pilih Buku Besar Akun:")
     target_col = f"Kode Akun {target_level}"
     filtered_coa = coa[coa[target_col].fillna("").astype(str).str.startswith(selected_kode)]
     akun_options = filtered_coa[f"Nama Akun {target_level}"].unique()
