@@ -9,7 +9,7 @@ def app():
         <style>
             .stMultiSelect div[role="listbox"] {
                 column-count: 3; /* Ubah menjadi kolom 3 untuk mengurangi jarak */
-                column-gap: 10px; /* Atur jarak antar kolom */
+                column-gap: 5px; /* Atur jarak antar kolom */
             }
             .stMultiSelect div[role="listbox"] > div {
                 margin-bottom: 5px; /* Atur jarak antar elemen */
