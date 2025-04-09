@@ -33,10 +33,19 @@ def app():
     # ================== PREPROCESSING ==================
     try:
         if "tgl_transaksi" in bukubesar.columns:
-            bukubesar["tgl_transaksi"] = pd.to_datetime(
-                bukubesar["tgl_transaksi"], 
-                errors="coerce"
-            )
+            # Parsing tanggal dengan format dd/mm/yyyy atau serial Excel
+            if bukubesar["tgl_transaksi"].dtype in ["float64", "int64"]:
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"], 
+                    unit="D", 
+                    origin="1899-12-30"
+                )
+            else:
+                bukubesar["tgl_transaksi"] = pd.to_datetime(
+                    bukubesar["tgl_transaksi"],
+                    format="%d/%m/%Y",
+                    errors="coerce"
+                )
             bukubesar = bukubesar.dropna(subset=["tgl_transaksi"])
         else:
             st.error("Kolom 'tgl_transaksi' tidak ditemukan")
@@ -61,7 +70,24 @@ def app():
     st.subheader("Filter Data")
     st.markdown("---")
 
-    # 1. Filter Unit
+    # 1. Filter Bulan
+    st.write("### Pilih Bulan:")
+    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
+    st.markdown("---")
+
+    # 2. Filter Jenis Transaksi
+    st.write("### Pilih Jenis Transaksi:")
+    jenis_transaksi_options = [
+        "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
+        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
+        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
+    ]
+    selected_jenis_transaksi = st.multiselect(
+        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
+    )
+    st.markdown("---")
+
+    # 3. Filter Unit (SKPD atau All)
     st.write("### Pilih Unit:")
     selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
     selected_skpd = None
@@ -70,54 +96,44 @@ def app():
         selected_skpd = st.selectbox("Pilih SKPD", skpd_options)
     st.markdown("---")
 
-    # 2. Filter Level Akun
+    # 4. Filter Level Akun
     st.write("### Pilih Level Akun:")
     selected_level = st.selectbox("Level", options=[f"Level {i}" for i in range(1, 7)])
     target_level = int(selected_level.split()[-1])
     st.markdown("---")
 
-    # 3. Filter Kategori Akun
+    # 5. Filter Kategori Akun
     st.write("### Pilih Kategori Akun:")
-    
     if target_level == 1:
         # Khusus Level 1 menggunakan mapping tetap
         kategori_options = list(level1_mapping.values())
         selected_kategori = st.selectbox("Kategori", options=kategori_options)
-        
-        # Dapatkan kode awalan dari mapping
         selected_kode = [k for k, v in level1_mapping.items() if v == selected_kategori][0]
     else:
         # Untuk level 2-6 ambil dari struktur COA
         parent_level = target_level - 1
         parent_col = f"Kode Akun {parent_level}"
+        name_col = f"Nama Akun {parent_level}"
         
-        # Validasi struktur hierarki
-        if parent_col not in coa.columns:
+        if parent_col not in coa.columns or name_col not in coa.columns:
             st.error(f"Struktur COA tidak valid untuk level {target_level}")
             return
         
-        # Ambil kategori berdasarkan level parent
-        kategori_options = coa[[parent_col, f"Nama Akun {parent_level}"]]
-        kategori_options = kategori_options.drop_duplicates().dropna()
-        
+        kategori_options = coa[[parent_col, name_col]].drop_duplicates().dropna()
         selected_parent = st.selectbox(
             "Kategori Induk",
-            options=kategori_options[f"Nama Akun {parent_level}"]
+            options=kategori_options[name_col]
         )
-        
-        # Dapatkan kode parent
         selected_kode = kategori_options[
-            kategori_options[f"Nama Akun {parent_level}"] == selected_parent
+            kategori_options[name_col] == selected_parent
         ][parent_col].iloc[0]
 
     st.markdown("---")
 
-    # 4. Filter Akun Spesifik
+    # 6. Filter Akun Spesifik
     st.write("### Pilih Akun:")
     target_col = f"Kode Akun {target_level}"
-    
-    # Filter berdasarkan kode parent
-    filtered_coa = coa[coa[target_col].str.startswith(selected_kode)]
+    filtered_coa = coa[coa[target_col].fillna("").astype(str).str.startswith(selected_kode)]
     akun_options = filtered_coa[f"Nama Akun {target_level}"].unique()
     
     if len(akun_options) > 0:
@@ -131,20 +147,44 @@ def app():
     
     st.markdown("---")
 
+    # 7. Filter Tipe Transaksi (Debet/Kredit/All)
+    st.write("### Pilih Tipe Transaksi:")
+    transaction_type = st.radio(
+        "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
+    )
+    st.markdown("---")
+
     # ================== PROCESS DATA ==================
     if st.button("Proses Data"):
         try:
-            # Filter dasar
-            filtered_data = bukubesar[
-                (bukubesar["kd_lv_6"].str.startswith(kode_akun)) &
-                (bukubesar["jns_transaksi"].notna())
-            ]
+            filtered_data = bukubesar.copy()
             
-            # Filter tambahan
+            # 1. Filter bulan
+            bulan_condition = (
+                (filtered_data["tgl_transaksi"].dt.month >= selected_month[0]) &
+                (filtered_data["tgl_transaksi"].dt.month <= selected_month[1])
+            )
+            filtered_data = filtered_data[bulan_condition]
+            
+            # 2. Filter jenis transaksi
+            filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+            
+            # 3. Filter unit
             if selected_unit == "SKPD" and selected_skpd:
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
             
-            # Gabungkan dengan data COA
+            # 4. Filter akun berdasarkan kategori
+            filtered_data = filtered_data[
+                filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
+            ]
+            
+            # 5. Filter tipe transaksi
+            if transaction_type == "Debet":
+                filtered_data = filtered_data[filtered_data["debet"] > 0]
+            elif transaction_type == "Kredit":
+                filtered_data = filtered_data[filtered_data["kredit"] > 0]
+            
+            # Gabungkan dengan COA untuk tampilkan nama akun
             merged_data = pd.merge(
                 filtered_data,
                 coa[["Kode Akun 6", "Nama Akun 6"]],
@@ -188,4 +228,5 @@ def app():
         except Exception as e:
             st.error(f"Terjadi kesalahan: {str(e)}")
 
+# Jalankan aplikasi
 app()
