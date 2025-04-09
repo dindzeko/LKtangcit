@@ -63,24 +63,6 @@ def app():
             st.error(f"Gagal memuat daftar SKPD: {str(e)}")
             return
 
-    # Inisialisasi session state untuk menyimpan daftar akun berdasarkan level
-    if "level_options" not in st.session_state:
-        try:
-            if "Level" not in coa.columns or coa["Level"].isnull().all():
-                raise ValueError("Kolom 'Level' tidak ditemukan atau kosong.")
-            
-            level_options = {}
-            for level in range(1, 7):
-                level_str = f"Level {level}"
-                level_options[level_str] = list(
-                    coa[coa["Level"] == level]["Nama Akun 6"].unique()
-                )
-            
-            st.session_state["level_options"] = level_options
-        except Exception as e:
-            st.error(f"Gagal memuat daftar akun: {str(e)}")
-            return
-
     # Widget filtering
     st.subheader("Filter Data")
     st.markdown("---")
@@ -114,41 +96,36 @@ def app():
             st.warning("Daftar SKPD tidak tersedia.")
     st.markdown("---")
 
-    # 4. Filter berdasarkan Kode Level dan Kategori Akun
-    st.write("### Pilih Kode Level:")
+    # 4. Filter berdasarkan Level Akun
+    st.write("### Pilih Level Akun:")
     level_options = [f"Level {i}" for i in range(1, 7)]
-    selected_level = st.selectbox("Kode Level", options=level_options)
-    
+    selected_level = st.selectbox("Level Akun", options=level_options)
+
+    # 5. Filter berdasarkan Kategori Akun
     st.write("### Pilih Kategori Akun:")
-    kategori_akun = {
-        "PENDAPATAN DAERAH-LO": "7",
-        "BEBAN DAERAH-LO": "8",
-        "PENDAPATAN DAERAH": "4",
-        "BELANJA DAERAH": "5",
-        "PEMBIAYAAN DAERAH": "6",
-        "ASET": "1",
-        "KEWAJIBAN": "2",
-        "EKUITAS": "3"
-    }
-    selected_kategori = st.selectbox("Kategori Akun", options=list(kategori_akun.keys()))
+    target_level = int(selected_level.split()[-1])
+    level_col = f"Kode Akun {target_level}"
+    name_col = f"Nama Akun {target_level}"
     
+    # Daftar kategori akun berdasarkan level yang dipilih
+    kategori_akun = coa[[level_col, name_col]].drop_duplicates()
+    selected_kategori = st.selectbox("Kategori Akun", options=kategori_akun[name_col])
+
+    # Dapatkan kode akun yang sesuai dengan kategori yang dipilih
+    selected_kode = kategori_akun[kategori_akun[name_col] == selected_kategori][level_col].iloc[0]
+
     # Filter akun berdasarkan level dan kategori
-    selected_akun = None
-    if selected_level:
-        target_level = int(selected_level.split()[-1])
-        target_kategori = kategori_akun[selected_kategori]
-        filtered_akun = coa[
-            (coa["Level"] == target_level) & 
-            (coa["Kode Akun 6"].astype(str).str.startswith(target_kategori))
-        ]["Nama Akun 6"].unique()
-        
-        if len(filtered_akun) > 0:
-            selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
-        else:
-            st.warning("Tidak ada akun tersedia untuk level dan kategori ini.")
+    filtered_akun = coa[
+        coa[level_col].astype(str).str.startswith(selected_kode)
+    ]["Nama Akun 6"].unique()
+
+    if len(filtered_akun) > 0:
+        selected_akun = st.selectbox("Pilih Akun:", options=filtered_akun)
+    else:
+        st.warning("Tidak ada akun tersedia untuk level dan kategori ini.")
     st.markdown("---")
 
-    # 5. Filter berdasarkan Debit/Kredit/All
+    # 6. Filter berdasarkan Debit/Kredit/All
     st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -174,12 +151,10 @@ def app():
             if selected_unit == "SKPD" and selected_skpd:
                 filtered_data = filtered_data[filtered_data["nm_unit"] == selected_skpd]
             
-            # 4. Filter akun berdasarkan hierarki kode
+            # 4. Filter akun berdasarkan kategori
             if selected_akun:
-                target_level = int(selected_level.split()[-1])
                 kode_akun = coa[
-                    (coa["Nama Akun 6"] == selected_akun) & 
-                    (coa["Level"] == target_level)
+                    coa["Nama Akun 6"] == selected_akun
                 ]["Kode Akun 6"].iloc[0]
                 
                 # Filter kd_lv_6 yang termasuk dalam hierarki kode terpilih
