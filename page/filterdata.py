@@ -70,13 +70,34 @@ def app():
     st.subheader("Filter Data")
     st.markdown("---")
 
-    # 1. Filter Level Akun
+    # 1. Filter Jenis Transaksi
+    st.write("### Pilih Jenis Transaksi:")
+    jenis_transaksi_options = [
+        "Jurnal Balik","Jurnal Eliminasi", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
+        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
+        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
+    ]
+    selected_jenis_transaksi = st.multiselect(
+        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
+    )
+    st.markdown("---")
+
+    # 2. Filter Unit (SKPD atau All)
+    st.write("### Pilih Unit:")
+    selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
+    selected_skpd = None
+    if selected_unit == "SKPD":
+        skpd_options = bukubesar["nm_unit"].unique()
+        selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
+    st.markdown("---")
+
+    # 3. Filter Level Akun
     st.write("### Pilih Level Akun:")
     selected_level = st.selectbox("Level", options=[f"Level {i}" for i in range(1, 7)])
     target_level = int(selected_level.split()[-1])
     st.markdown("---")
 
-    # 2. Filter Kategori Akun
+    # 4. Filter Kategori Akun
     st.write("### Pilih Kategori Akun:")
     if target_level == 1:
         # Khusus Level 1 menggunakan mapping tetap
@@ -104,7 +125,7 @@ def app():
 
     st.markdown("---")
 
-    # 3. Filter Akun Spesifik
+    # 5. Filter Akun Spesifik
     st.write("### Pilih Akun:")
     target_col = f"Kode Akun {target_level}"
     filtered_coa = coa[coa[target_col].fillna("").astype(str).str.startswith(selected_kode)]
@@ -119,27 +140,6 @@ def app():
         st.warning("Tidak ada akun tersedia")
         return
     
-    st.markdown("---")
-
-    # 4. Filter Jenis Transaksi
-    st.write("### Pilih Jenis Transaksi:")
-    jenis_transaksi_options = [
-        "Jurnal Balik","Jurnal Eliminasi", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
-        "Jurnal Penerimaan", "Jurnal Pengeluaran", "Jurnal Penutup", 
-        "Jurnal Penyesuaian", "Jurnal Umum", "Saldo Awal"
-    ]
-    selected_jenis_transaksi = st.multiselect(
-        "Jenis Transaksi", options=jenis_transaksi_options, default=jenis_transaksi_options
-    )
-    st.markdown("---")
-
-    # 5. Filter Unit (SKPD atau All)
-    st.write("### Pilih Unit:")
-    selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
-    selected_skpd = None
-    if selected_unit == "SKPD":
-        skpd_options = bukubesar["nm_unit"].unique()
-        selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
     st.markdown("---")
 
     # 6. Filter Tipe Transaksi (Debet/Kredit/All)
