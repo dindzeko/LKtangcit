@@ -12,7 +12,7 @@ def app():
                 column-gap: 5px; /* Atur jarak antar kolom */
             }
             .stMultiSelect div[role="listbox"] > div {
-                margin-bottom: 5px; /* Atur jarak antar elemen */
+                margin-bottom: 1px; /* Atur jarak antar elemen */
             }
         </style>
         """,
