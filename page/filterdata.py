@@ -46,7 +46,10 @@ def app():
                     format="%d/%m/%Y",
                     errors="coerce"
                 )
-            bukubesar = bukubesar.dropna(subset=["tgl_transaksi"])
+            
+            # Tetapkan tanggal default 31/12/2024 untuk baris dengan tanggal kosong atau NaT
+            default_date = pd.to_datetime("31/12/2024", format="%d/%m/%Y")
+            bukubesar["tgl_transaksi"] = bukubesar["tgl_transaksi"].fillna(default_date)
         else:
             st.error("Kolom 'tgl_transaksi' tidak ditemukan")
             return
@@ -121,7 +124,12 @@ def app():
     
     st.markdown("---")
 
-    # 4. Filter Jenis Transaksi
+    # 4. Filter Bulan
+    st.write("### Pilih Bulan:")
+    selected_month = st.slider("Bulan", min_value=1, max_value=12, value=(1, 12), step=1)
+    st.markdown("---")
+
+    # 5. Filter Jenis Transaksi
     st.write("### Pilih Jenis Transaksi:")
     jenis_transaksi_options = [
         "Jurnal Balik", "Jurnal Koreksi", "Jurnal Non RKUD", "Jurnal Pembiayaan", 
@@ -133,7 +141,7 @@ def app():
     )
     st.markdown("---")
 
-    # 5. Filter Unit (SKPD atau All)
+    # 6. Filter Unit (SKPD atau All)
     st.write("### Pilih Unit:")
     selected_unit = st.radio("Unit", ["All", "SKPD"], index=0)
     selected_skpd = None
@@ -142,7 +150,7 @@ def app():
         selected_skpd = st.selectbox("Pilih SKPD", options=skpd_options)
     st.markdown("---")
 
-    # 6. Filter Tipe Transaksi (Debet/Kredit/All)
+    # 7. Filter Tipe Transaksi (Debet/Kredit/All)
     st.write("### Pilih Tipe Transaksi:")
     transaction_type = st.radio(
         "Tipe Transaksi", options=["Debet", "Kredit", "All"], horizontal=True
@@ -162,14 +170,21 @@ def app():
             filtered_data["debet"] = filtered_data["debet"].fillna(0)
             filtered_data["kredit"] = filtered_data["kredit"].fillna(0)
             
-            # Filter akun berdasarkan kategori
-            filtered_data = filtered_data[
-                filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
-            ]
+            # Filter berdasarkan bulan
+            bulan_condition = (
+                (filtered_data["tgl_transaksi"].dt.month >= selected_month[0]) &
+                (filtered_data["tgl_transaksi"].dt.month <= selected_month[1])
+            )
+            filtered_data = filtered_data[bulan_condition]
             
             # Filter jenis transaksi
             if selected_jenis_transaksi:
                 filtered_data = filtered_data[filtered_data["jns_transaksi"].isin(selected_jenis_transaksi)]
+            
+            # Filter akun berdasarkan kategori
+            filtered_data = filtered_data[
+                filtered_data["kd_lv_6"].astype(str).str.startswith(kode_akun)
+            ]
             
             # Filter tipe transaksi
             if transaction_type == "Debet":
